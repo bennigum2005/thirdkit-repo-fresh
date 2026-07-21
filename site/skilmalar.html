@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Third Kit — Skilmálar</title>
+<meta name="description" content="Viðskiptaskilmálar Third Kit.">
+<style>
+  :root{
+    --black:#0a0a0a;
+    --black-2:#121212;
+    --black-3:#1a1a1a;
+    --gold:#d4af37;
+    --gold-bright:#f0cf5d;
+    --gold-dim:rgba(212,175,55,.35);
+    --text:#f5f2e9;
+    --muted:#9a9587;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:
+      radial-gradient(ellipse 60% 30% at 50% 0%, rgba(212,175,55,.10), transparent 70%),
+      var(--black);
+    color:var(--text);
+    font-family:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:center;
+    padding:18px 6vw;
+    background:rgba(10,10,10,.82);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(212,175,55,.18);
+  }
+  .logo{
+    font-size:1.35rem;font-weight:800;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--text);text-decoration:none;
+  }
+  .logo span{color:var(--gold)}
+
+  main{
+    max-width:760px;margin:0 auto;
+    padding:130px 6vw 90px;
+    animation:fade .45s ease;
+  }
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .back{
+    color:var(--muted);text-decoration:none;font-size:.75rem;
+    letter-spacing:.22em;text-transform:uppercase;margin-bottom:28px;
+    display:inline-block;transition:color .2s;
+  }
+  .back:hover{color:var(--gold-bright)}
+  h1{
+    font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;
+    letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;
+  }
+  h1 em{color:var(--gold);font-style:normal}
+  .updated{color:var(--muted);font-size:.78rem;letter-spacing:.1em;margin-bottom:40px}
+  section{margin-bottom:34px}
+  h2{
+    color:var(--gold);font-size:.95rem;font-weight:700;
+    letter-spacing:.2em;text-transform:uppercase;margin-bottom:12px;
+    padding-bottom:8px;border-bottom:1px solid rgba(212,175,55,.18);
+  }
+  p{color:#cfcabb;font-size:.95rem;line-height:1.8;margin-bottom:10px}
+  .placeholder{color:var(--gold-bright);font-style:italic}
+  footer{
+    text-align:center;padding:26px 6vw 34px;color:var(--muted);font-size:.68rem;
+    letter-spacing:.14em;border-top:1px solid rgba(212,175,55,.12);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">Third<span>&nbsp;Kit</span></a>
+</header>
+
+<main>
+  <a class="back" href="index.html">← Til baka</a>
+  <h1>Skil<em>málar</em></h1>
+  <p class="updated">Síðast uppfært: 21. júlí 2026</p>
+
+  <section>
+    <h2>1. Almennt</h2>
+    <p>Skilmálar þessir gilda um öll kaup á vörum í vefverslun Third Kit. Með því að ganga frá pöntun samþykkir kaupandi skilmálana eins og þeir eru á þeim tíma sem kaup fara fram.</p>
+    <p>Seljandi er <span class="placeholder">[NAFN FYRIRTÆKIS]</span>, kt. <span class="placeholder">[KENNITALA]</span>, <span class="placeholder">[HEIMILISFANG]</span>. Fyrirspurnir berist á <span class="placeholder">[NETFANG]</span>.</p>
+  </section>
+
+  <section>
+    <h2>2. Vörur og verð</h2>
+    <p>Öll verð eru birt í íslenskum krónum og innihalda virðisaukaskatt. Verð geta breyst án fyrirvara, en pöntun er alltaf gerð á því verði sem birt var þegar hún var staðfest.</p>
+    <p>Fyrirvari er gerður um innsláttarvillur í verðum og vörulýsingum sem og að vörur geti selst upp.</p>
+  </section>
+
+  <section>
+    <h2>3. Pöntun og greiðsla</h2>
+    <p>Þegar smellt er á „Setja í körfu" er kaupandi sendur áfram á örugga greiðslusíðu samstarfsaðila okkar, þar sem greiðsla fer fram. Third Kit geymir ekki og hefur ekki aðgang að greiðslukortaupplýsingum kaupanda.</p>
+    <p>Pöntun telst staðfest þegar greiðsla hefur borist og staðfesting verið send á netfang kaupanda.</p>
+  </section>
+
+  <section>
+    <h2>4. Afhending</h2>
+    <p>Vörur eru sendar með <span class="placeholder">[SENDINGARAÐILI, t.d. Póstinum/Dropp]</span> og er afhendingartími að jafnaði <span class="placeholder">[X–X virkir dagar]</span> frá staðfestingu pöntunar. Sendingarkostnaður kemur fram við frágang kaupa hjá greiðslusíðu samstarfsaðila.</p>
+    <p>Tafir sem rekja má til flutningsaðila eru á ábyrgð hans, en Third Kit aðstoðar kaupanda við að leysa úr slíkum málum eftir bestu getu.</p>
+  </section>
+
+  <section>
+    <h2>5. Skilaréttur</h2>
+    <p>Í samræmi við lög um neytendasamninga nr. 16/2016 hefur kaupandi 14 daga frest frá móttöku vöru til að falla frá kaupum án þess að tilgreina ástæðu. Tilkynning um skil skal send á <span class="placeholder">[NETFANG]</span> innan frestsins.</p>
+    <p>Vara skal vera ónotuð, í upprunalegu ástandi og með öllum merkimiðum. Kaupandi ber kostnað af því að senda vöru til baka nema annað sé tekið fram. Endurgreiðsla fer fram innan 14 daga frá því að varan berst okkur, með sama greiðslumáta og notaður var við kaupin.</p>
+  </section>
+
+  <section>
+    <h2>6. Stærðarskipti</h2>
+    <p>Óski kaupandi eftir að skipta í aðra stærð skal hafa samband á <span class="placeholder">[NETFANG]</span> innan 14 daga frá móttöku. Skipti eru háð því að umbeðin stærð sé til á lager. Varan skal vera ónotuð og með merkimiðum.</p>
+  </section>
+
+  <section>
+    <h2>7. Gallar og kvartanir</h2>
+    <p>Um galla fer samkvæmt lögum um neytendakaup nr. 48/2003. Reynist vara gölluð á kaupandi rétt á nýrri vöru, viðgerð, afslætti eða endurgreiðslu eftir atvikum. Kvartanir vegna galla skal senda á <span class="placeholder">[NETFANG]</span> ásamt mynd og lýsingu á gallanum og númeri pöntunar.</p>
+    <p>Third Kit ber ekki ábyrgð á skemmdum sem rekja má til rangrar meðferðar, svo sem þvotts sem ekki samræmist þvottaleiðbeiningum.</p>
+  </section>
+
+  <section>
+    <h2>8. Persónuvernd</h2>
+    <p>Third Kit vinnur einungis með þær persónuupplýsingar sem nauðsynlegar eru til að afgreiða pöntun, svo sem nafn, netfang, heimilisfang og símanúmer, í samræmi við lög nr. 90/2018 um persónuvernd og vinnslu persónuupplýsinga. Upplýsingarnar eru ekki seldar eða afhentar þriðja aðila nema að því marki sem nauðsynlegt er til að afhenda vöruna (t.d. flutningsaðila) eða lög krefjast.</p>
+    <p>Greiðsluupplýsingar eru meðhöndlaðar af greiðslusíðu samstarfsaðila okkar og lúta persónuverndarstefnu hans.</p>
+  </section>
+
+  <section>
+    <h2>9. Ábyrgð</h2>
+    <p>Ábyrgð Third Kit takmarkast við kaupverð vörunnar. Third Kit ber ekki ábyrgð á óbeinu eða afleiddu tjóni sem rekja má til notkunar vöru eða tafa á afhendingu, að því marki sem lög heimila.</p>
+  </section>
+
+  <section>
+    <h2>10. Breytingar á skilmálum</h2>
+    <p>Third Kit áskilur sér rétt til að breyta skilmálum þessum. Breytingar taka gildi við birtingu á þessari síðu og gilda um kaup sem gerð eru eftir birtingu.</p>
+  </section>
+
+  <section>
+    <h2>11. Lög og ágreiningur</h2>
+    <p>Um skilmála þessa gilda íslensk lög. Rísi ágreiningur um viðskipti skal fyrst leitast við að leysa hann í samráði við kaupanda. Náist ekki sátt getur kaupandi beint kvörtun til Kærunefndar vöru- og þjónustukaupa eða borið málið undir Héraðsdóm Reykjavíkur.</p>
+  </section>
+</main>
+
+<footer>
+  &copy; 2026 Third Kit. Allur réttur áskilinn.
+</footer>
+
+</body>
+</html>

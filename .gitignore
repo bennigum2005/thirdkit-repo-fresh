@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Azure Functions local settings (contains secrets — never commit)
+local.settings.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+*.log
+
+# Build output
+dist/
+bin/
+obj/

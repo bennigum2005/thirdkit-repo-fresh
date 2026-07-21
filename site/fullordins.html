@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Third Kit — Fullorðins</title>
+<meta name="description" content="Third Kit treyjan fyrir fullorðna — svart og gull. Stærðir XS–XXL.">
+<style>
+  :root{
+    --black:#0a0a0a;
+    --black-2:#121212;
+    --black-3:#1a1a1a;
+    --gold:#d4af37;
+    --gold-bright:#f0cf5d;
+    --gold-dim:rgba(212,175,55,.35);
+    --text:#f5f2e9;
+    --muted:#9a9587;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--black);
+    color:var(--text);
+    font-family:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:center;
+    padding:18px 6vw;
+    background:rgba(10,10,10,.82);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(212,175,55,.18);
+  }
+  .logo{
+    font-size:1.35rem;font-weight:800;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--text);text-decoration:none;
+  }
+  .logo span{color:var(--gold)}
+
+  .product{
+    height:100vh;height:100dvh;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:80px 6vw 46px;text-align:center;
+    animation:fade .45s ease;
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(212,175,55,.10), transparent 70%),
+      var(--black);
+  }
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .back{
+    color:var(--muted);text-decoration:none;font-size:.75rem;
+    letter-spacing:.22em;text-transform:uppercase;margin-bottom:18px;
+    display:inline-block;transition:color .2s;
+  }
+  .back:hover{color:var(--gold-bright)}
+  .card{
+    background:linear-gradient(180deg,var(--black-3),var(--black-2));
+    border:1px solid rgba(212,175,55,.22);
+    border-radius:6px;padding:clamp(22px,4vh,42px) clamp(26px,4vw,42px);
+    max-width:460px;width:100%;position:relative;overflow:hidden;
+  }
+  .card::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  }
+  .tag{
+    display:inline-block;font-size:.68rem;font-weight:700;
+    letter-spacing:.3em;text-transform:uppercase;
+    color:var(--gold);border:1px solid var(--gold-dim);
+    padding:5px 15px;border-radius:999px;margin-bottom:14px;
+  }
+  .card .box-art{width:clamp(110px,20vh,180px);height:auto;margin:0 auto 14px;display:block;filter:drop-shadow(0 12px 28px rgba(0,0,0,.55))}
+  .card h3{font-size:1.45rem;text-transform:uppercase;letter-spacing:.1em;font-weight:800}
+  .card .fit{color:var(--muted);font-size:.88rem;margin:10px 0 0;line-height:1.6}
+  .price{
+    font-size:1.6rem;font-weight:800;color:var(--gold-bright);
+    margin:12px 0 2px;letter-spacing:.04em;
+  }
+  .size-label{
+    margin:12px 0 8px;font-size:.72rem;font-weight:700;
+    letter-spacing:.26em;text-transform:uppercase;color:var(--muted);
+  }
+  .size-select{
+    display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:18px;
+  }
+  .size-select button{
+    background:transparent;color:var(--text);
+    border:1px solid rgba(255,255,255,.18);border-radius:3px;
+    min-width:48px;padding:11px 10px;cursor:pointer;
+    font-size:.82rem;font-weight:600;letter-spacing:.06em;
+    font-family:inherit;transition:all .15s ease;
+  }
+  .size-select button:hover{border-color:var(--gold-dim);color:var(--gold-bright)}
+  .size-select button.selected{
+    background:linear-gradient(120deg,var(--gold),var(--gold-bright));
+    color:#0a0a0a;border-color:var(--gold-bright);font-weight:800;
+  }
+  .size-select button:disabled{
+    opacity:.32;text-decoration:line-through;cursor:not-allowed;
+    border-color:rgba(255,255,255,.1);color:var(--muted);
+  }
+  .btn{
+    display:inline-block;width:100%;padding:14px 38px;
+    font-size:.8rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+    text-decoration:none;cursor:pointer;border-radius:2px;border:1px solid var(--gold-bright);
+    background:linear-gradient(120deg,var(--gold),var(--gold-bright));color:#0a0a0a;
+    transition:transform .18s ease, box-shadow .18s ease;
+    font-family:inherit;
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(212,175,55,.35)}
+  .secure{margin-top:12px;font-size:.7rem;color:var(--muted);letter-spacing:.08em}
+  .perks{
+    display:flex;gap:26px;justify-content:center;flex-wrap:wrap;
+    margin-top:22px;max-width:560px;
+  }
+  .perks span{
+    color:var(--muted);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  }
+  .perks b{color:var(--gold);font-weight:700}
+  footer{
+    position:fixed;bottom:0;left:0;right:0;z-index:40;
+    text-align:center;padding:12px 6vw;color:var(--muted);font-size:.68rem;
+    letter-spacing:.14em;pointer-events:none;
+  }
+  footer a{color:var(--gold);text-decoration:none;pointer-events:auto}
+  footer a:hover{color:var(--gold-bright)}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">Third<span>&nbsp;Kit</span></a>
+</header>
+
+<section class="product">
+  <a class="back" href="index.html">← Til baka</a>
+  <div class="card">
+    <div class="tag">Fullorðins</div>
+    <svg class="box-art" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M62 28 L84 18 Q100 30 116 18 L138 28 L172 52 L156 82 L142 72 L142 176 Q100 188 58 176 L58 72 L44 82 L28 52 Z"
+            fill="#161616" stroke="#d4af37" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M84 18 Q100 30 116 18 Q112 34 100 34 Q88 34 84 18Z" fill="#d4af37"/>
+      <path d="M70 100 H130" stroke="#d4af37" stroke-width="3"/>
+      <path d="M70 112 H130" stroke="#d4af37" stroke-width="3"/>
+      <text x="100" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold"
+            font-size="20" fill="#f0cf5d" letter-spacing="2">III</text>
+    </svg>
+    <h3>Third Kit — Fullorðins</h3>
+    <p class="fit">Treyjan í svörtu og gulli. Létt og andar vel — hönnuð fyrir völlinn og götuna.</p>
+    <div class="price" id="price">—</div>
+    <div class="size-label">Veldu stærð</div>
+    <div class="size-select" id="sizes">
+      <button onclick="pickSize('XS',this)">XS</button>
+      <button onclick="pickSize('S',this)">S</button>
+      <button onclick="pickSize('M',this)">M</button>
+      <button onclick="pickSize('L',this)">L</button>
+      <button onclick="pickSize('XL',this)">XL</button>
+      <button onclick="pickSize('XXL',this)">XXL</button>
+    </div>
+    <button class="btn" onclick="buy()">Setja í körfu</button>
+    <p class="secure">Þú verður send/ur áfram á örugga greiðslusíðu</p>
+  </div>
+  <div class="perks">
+    <span><b>✓</b> Vandað efni</span>
+    <span><b>✓</b> Svart &amp; gull</span>
+    <span><b>✓</b> Örugg greiðsla</span>
+  </div>
+</section>
+
+<footer>
+  &copy; 2026 Third Kit. Allur réttur áskilinn. &nbsp;·&nbsp; <a href="skilmalar.html">Skilmálar</a>
+</footer>
+
+<script>
+  /* =====================================================
+     EDIT THIS BLOCK ONLY
+     Settu greiðsluhlekk og verð hér að neðan.
+     ===================================================== */
+  const PRICE = "PRICE HERE";                            // t.d. "9.990 kr."
+  const CHECKOUT_URL = "PASTE-ADULT-CHECKOUT-LINK";      // t.d. "https://verslun.is/fullordins"
+  const AVAILABILITY_URL = "PASTE-AVAILABILITY-URL";     // t.d. "https://thirdkit-func.azurewebsites.net/api/availability"
+  const PRODUCT_KEY = "adult";                           // lykillinn í ITEM_MAP í middleware
+  /* ===================================================== */
+
+  document.getElementById("price").textContent =
+    (!PRICE || PRICE.startsWith("PRICE")) ? "—" : PRICE;
+
+  let selectedSize = null;
+  function pickSize(size, el){
+    selectedSize = size;
+    el.parentElement.querySelectorAll("button").forEach(b => b.classList.remove("selected"));
+    el.classList.add("selected");
+  }
+  function buy(){
+    if(!selectedSize){ alert("Vinsamlegast veldu stærð fyrst."); return; }
+    if(!CHECKOUT_URL || CHECKOUT_URL.startsWith("PASTE")){
+      alert("Greiðsluhlekkur hefur ekki verið settur inn — bættu honum við efst í <script> hlutanum.");
+      return;
+    }
+    const sep = CHECKOUT_URL.includes("?") ? "&" : "?";
+    window.location.href = CHECKOUT_URL + sep + "size=" + encodeURIComponent(selectedSize);
+  }
+
+  /* Lifandi lagerstaða úr Business Central (gegnum middleware).
+     Ef URL er ekki sett eða kallið mistekst haldast allar stærðir virkar. */
+  async function loadAvailability(){
+    if(!AVAILABILITY_URL || AVAILABILITY_URL.startsWith("PASTE")) return;
+    try{
+      const res = await fetch(AVAILABILITY_URL);
+      if(!res.ok) return;
+      const stock = (await res.json())[PRODUCT_KEY] || {};
+      document.querySelectorAll("#sizes button").forEach(btn => {
+        const size = btn.textContent.trim();
+        if((stock[size] ?? 0) <= 0){
+          btn.disabled = true;
+          btn.title = "Uppselt";
+          btn.classList.remove("selected");
+          if(selectedSize === size) selectedSize = null;
+        }
+      });
+    }catch(e){ /* engin tenging — stærðir haldast virkar */ }
+  }
+  loadAvailability();
+</script>
+
+</body>
+</html>

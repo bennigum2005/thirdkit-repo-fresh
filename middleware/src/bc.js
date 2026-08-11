@@ -77,3 +77,35 @@ function itemMap() {
 }
 
 module.exports = { bcFetch, getCompanyId, itemMap };
+
+async function createSalesOrder(itemNumber, quantity, externalDocNumber) {
+  const companyId = await getCompanyId();
+
+  const existing = await bcFetch(
+    `/companies(${companyId})/salesOrders?$filter=externalDocumentNumber eq '${externalDocNumber.replace(/'/g, "''")}'&$select=id,number`
+  );
+  if (existing.value?.length) {
+    return { status: "already-exists", bcOrderNumber: existing.value[0].number };
+  }
+
+  const order = await bcFetch(`/companies(${companyId})/salesOrders`, {
+    method: "POST",
+    body: JSON.stringify({
+      customerNumber: process.env.DEFAULT_CUSTOMER,
+      externalDocumentNumber: externalDocNumber,
+    }),
+  });
+
+  await bcFetch(`/companies(${companyId})/salesOrders(${order.id})/salesOrderLines`, {
+    method: "POST",
+    body: JSON.stringify({
+      lineType: "Item",
+      lineObjectNumber: itemNumber,
+      quantity: quantity,
+    }),
+  });
+
+  return { status: "created", bcOrderNumber: order.number };
+}
+
+module.exports.createSalesOrder = createSalesOrder;

@@ -28,7 +28,7 @@
   header{
     position:fixed;top:0;left:0;right:0;z-index:50;
     display:flex;align-items:center;justify-content:center;
-    padding:18px 6vw;
+    padding:10px 6vw;
     background:rgba(10,10,10,.82);
     backdrop-filter:blur(12px);
     border-bottom:1px solid rgba(212,175,55,.18);
@@ -38,6 +38,7 @@
     text-transform:uppercase;color:var(--text);text-decoration:none;
   }
   .logo span{color:var(--gold)}
+  .logo img{height:56px;display:block}
 
   .product{
     height:100vh;height:100dvh;overflow:hidden;
@@ -131,7 +132,7 @@
 <body>
 
 <header>
-  <a class="logo" href="index.html">Third<span>&nbsp;Kit</span></a>
+  <a class="logo" href="index.html"><img src="logo.png" alt="Third Kit"></a>
 </header>
 
 <section class="product">
@@ -201,6 +202,7 @@
     window.location.href = PAY_URL + "?product=" + PRODUCT_KEY + "&size=" + encodeURIComponent(selectedSize);
   }
 
+  /* Ef komið til baka af því að stærðin seldist upp á meðan */
   if(new URLSearchParams(location.search).get("soldout") === "1"){
     document.querySelector(".fit").insertAdjacentHTML("afterend",
       '<p style="color:var(--gold-bright);font-size:.8rem;margin-top:10px;letter-spacing:.06em">Því miður seldist þessi stærð upp — veldu aðra stærð.</p>');

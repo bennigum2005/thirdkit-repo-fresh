@@ -28,7 +28,7 @@
   header{
     position:fixed;top:0;left:0;right:0;z-index:50;
     display:flex;align-items:center;justify-content:center;
-    padding:18px 6vw;
+    padding:10px 6vw;
     background:rgba(10,10,10,.82);
     backdrop-filter:blur(12px);
     border-bottom:1px solid rgba(212,175,55,.18);
@@ -38,6 +38,7 @@
     text-transform:uppercase;color:var(--text);text-decoration:none;
   }
   .logo span{color:var(--gold)}
+  .logo img{height:56px;display:block}
 
   .front{
     height:100vh;height:100dvh;overflow:hidden;
@@ -49,14 +50,9 @@
       var(--black);
   }
   @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  .front h1{
-    font-size:clamp(2.4rem,7vh,5rem);
-    font-weight:800;line-height:1.04;letter-spacing:.1em;
-    text-transform:uppercase;
-  }
-  .front h1 .gold{
-    background:linear-gradient(120deg,var(--gold) 20%,var(--gold-bright) 50%,var(--gold) 80%);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
+  .hero-logo{
+    width:clamp(180px,34vh,320px);height:auto;display:block;
+    filter:drop-shadow(0 14px 44px rgba(212,175,55,.16));
   }
   .front .rule{
     width:90px;height:2px;margin:24px auto;
@@ -121,11 +117,11 @@
 <body>
 
 <header>
-  <a class="logo" href="index.html">Third<span>&nbsp;Kit</span></a>
+  <a class="logo" href="index.html"><img src="logo.png" alt="Third Kit"></a>
 </header>
 
 <section class="front">
-  <h1>Third<br><span class="gold">Kit</span></h1>
+  <img class="hero-logo" src="logo.png" alt="Third Kit">
   <div class="rule"></div>
 
   <div class="choices">

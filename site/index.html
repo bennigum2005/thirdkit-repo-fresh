@@ -99,6 +99,23 @@
   }
   footer a{color:var(--gold);text-decoration:none;pointer-events:auto}
   footer a:hover{color:var(--gold-bright)}
+
+  /* Intro video overlay */
+  #intro{
+    position:fixed;inset:0;z-index:100;background:#000;
+    opacity:1;transition:opacity 2s ease;
+  }
+  #intro.fade{opacity:0;pointer-events:none}
+  #intro video{width:100%;height:100%;object-fit:cover}
+  #intro .skip{
+    position:absolute;bottom:34px;right:34px;
+    background:rgba(10,10,10,.55);color:var(--gold-bright);
+    border:1px solid rgba(212,175,55,.45);border-radius:2px;
+    padding:10px 22px;cursor:pointer;font-family:inherit;
+    font-size:.72rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+    backdrop-filter:blur(6px);transition:border-color .2s;
+  }
+  #intro .skip:hover{border-color:var(--gold-bright)}
 </style>
 </head>
 <body>
@@ -147,6 +164,41 @@
 <footer>
   &copy; 2026 Third Kit. Allur réttur áskilinn. &nbsp;·&nbsp; <a href="skilmalar.html">Skilmálar</a>
 </footer>
+
+<div id="intro">
+  <video id="introVideo" src="intro.mp4" autoplay muted playsinline preload="auto"></video>
+  <button class="skip" onclick="endIntro()">Sleppa →</button>
+</div>
+
+<script>
+  (function(){
+    const intro = document.getElementById("intro");
+    const video = document.getElementById("introVideo");
+    let ended = false;
+
+    // Spilast einu sinni í hverri heimsókn — ekki aftur þegar smellt er
+    // "Til baka" af vörusíðu í sömu lotu
+    let seen = false;
+    try { seen = sessionStorage.getItem("tk-intro") === "1"; } catch(e){}
+    if (seen) { intro.remove(); return; }
+
+    window.endIntro = function(){
+      if (ended) return;
+      ended = true;
+      try { sessionStorage.setItem("tk-intro", "1"); } catch(e){}
+      intro.classList.add("fade");
+      setTimeout(() => intro.remove(), 2100);
+    };
+
+    video.addEventListener("ended", endIntro);
+    video.addEventListener("error", endIntro);
+    // Ef vafrinn neitar að spila (t.d. gagnasparnaður) — sleppa intro-inu
+    const p = video.play();
+    if (p && p.catch) p.catch(endIntro);
+    // Öryggisnet: aldrei fastur á intro-inu
+    setTimeout(endIntro, 12000);
+  })();
+</script>
 
 </body>
 </html>

@@ -1,29 +1,11 @@
-/**
- * Shared helpers for talking to Business Central.
- *
- * Required environment variables (set these in the Function App > Configuration):
- *
- *   TENANT_ID        - Microsoft Entra tenant ID (GUID or yourdomain.onmicrosoft.com)
- *   CLIENT_ID        - App registration (client) ID
- *   CLIENT_SECRET    - App registration client secret VALUE
- *   BC_ENVIRONMENT   - Business Central environment name, usually "Production"
- *   BC_COMPANY_ID    - Company ID (GUID). Leave empty to auto-pick the first company.
- *   ITEM_MAP         - JSON mapping of product/size -> BC item number, e.g.
- *                      {"adult":{"XS":"TK-A-XS","S":"TK-A-S","M":"TK-A-M","L":"TK-A-L","XL":"TK-A-XL","XXL":"TK-A-XXL"},
- *                       "kids":{"110":"TK-K-110","128":"TK-K-128","140":"TK-K-140","152":"TK-K-152","164":"TK-K-164","176":"TK-K-176"}}
- *   DEFAULT_CUSTOMER - BC customer number used for web orders, e.g. "WEB-THIRDKIT"
- *   WEBHOOK_SECRET   - Shared secret the checkout provider must send in the
- *                      "x-webhook-secret" header when posting orders
- */
-
 let cachedToken = null;
 let cachedTokenExpiry = 0;
 let cachedCompanyId = null;
+const cachedIds = {};
 
 async function getToken() {
   const now = Date.now();
   if (cachedToken && now < cachedTokenExpiry - 60_000) return cachedToken;
-
   const tenant = process.env.TENANT_ID;
   const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
     method: "POST",
@@ -42,15 +24,15 @@ async function getToken() {
   return cachedToken;
 }
 
-function apiBase() {
+function envBase() {
   const tenant = process.env.TENANT_ID;
   const env = process.env.BC_ENVIRONMENT || "Production";
-  return `https://api.businesscentral.dynamics.com/v2.0/${tenant}/${env}/api/v2.0`;
+  return `https://api.businesscentral.dynamics.com/v2.0/${tenant}/${env}`;
 }
 
-async function bcFetch(path, options = {}) {
+async function rawFetch(url, options = {}) {
   const token = await getToken();
-  const res = await fetch(`${apiBase()}${path}`, {
+  const res = await fetch(url, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -58,9 +40,18 @@ async function bcFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   });
-  if (!res.ok) throw new Error(`BC ${options.method || "GET"} ${path} failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`BC ${options.method || "GET"} ${url} failed: ${res.status} ${await res.text()}`);
   if (res.status === 204) return null;
   return res.json();
+}
+
+async function bcFetch(path, options = {}) {
+  return rawFetch(`${envBase()}/api/v2.0${path}`, options);
+}
+
+async function odataFetch(serviceAndQuery) {
+  const company = encodeURIComponent(process.env.BC_COMPANY_NAME || "");
+  return rawFetch(`${envBase()}/ODataV4/Company('${company}')/${serviceAndQuery}`);
 }
 
 async function getCompanyId() {
@@ -76,18 +67,47 @@ function itemMap() {
   return JSON.parse(process.env.ITEM_MAP || "{}");
 }
 
-module.exports = { bcFetch, getCompanyId, itemMap };
-
-async function createSalesOrder(itemNumber, quantity, externalDocNumber) {
+async function getItemAndVariantId(itemNumber, variantCode) {
+  const cached = cachedIds[itemNumber];
+  if (cached?.variants?.[variantCode]) {
+    return { itemId: cached.id, variantId: cached.variants[variantCode] };
+  }
   const companyId = await getCompanyId();
+  const items = await bcFetch(
+    `/companies(${companyId})/items?$filter=number eq '${itemNumber.replace(/'/g, "''")}'&$select=id,number`
+  );
+  const item = items.value?.[0];
+  if (!item) throw new Error(`Item ${itemNumber} not found in BC`);
+  const variants = await bcFetch(`/companies(${companyId})/items(${item.id})/itemVariants?$select=id,code`);
+  const map = {};
+  for (const v of variants.value || []) map[v.code] = v.id;
+  cachedIds[itemNumber] = { id: item.id, variants: map };
+  const variantId = map[variantCode];
+  if (!variantId) throw new Error(`Variant '${variantCode}' not found on item ${itemNumber}`);
+  return { itemId: item.id, variantId };
+}
 
+async function getVariantInventory(itemNumber) {
+  const service = process.env.BC_LEDGER_SERVICE || "SiteItemLedger";
+  const filter = encodeURIComponent(`Item_No eq '${itemNumber.replace(/'/g, "''")}'`);
+  const data = await odataFetch(`${service}?$filter=${filter}&$select=Item_No,Variant_Code,Quantity`);
+  const perVariant = {};
+  for (const row of data.value || []) {
+    const code = row.Variant_Code || "";
+    perVariant[code] = (perVariant[code] || 0) + Number(row.Quantity || 0);
+  }
+  return perVariant;
+}
+
+async function createSalesOrder(itemNumber, variantCode, quantity, externalDocNumber) {
+  const companyId = await getCompanyId();
   const existing = await bcFetch(
     `/companies(${companyId})/salesOrders?$filter=externalDocumentNumber eq '${externalDocNumber.replace(/'/g, "''")}'&$select=id,number`
   );
   if (existing.value?.length) {
     return { status: "already-exists", bcOrderNumber: existing.value[0].number };
   }
-
+  const { variantId } = await getItemAndVariantId(itemNumber, variantCode);
   const order = await bcFetch(`/companies(${companyId})/salesOrders`, {
     method: "POST",
     body: JSON.stringify({
@@ -95,17 +115,16 @@ async function createSalesOrder(itemNumber, quantity, externalDocNumber) {
       externalDocumentNumber: externalDocNumber,
     }),
   });
-
   await bcFetch(`/companies(${companyId})/salesOrders(${order.id})/salesOrderLines`, {
     method: "POST",
     body: JSON.stringify({
       lineType: "Item",
       lineObjectNumber: itemNumber,
+      itemVariantId: variantId,
       quantity: quantity,
     }),
   });
-
   return { status: "created", bcOrderNumber: order.number };
 }
 
-module.exports.createSalesOrder = createSalesOrder;
+module.exports = { bcFetch, odataFetch, getCompanyId, itemMap, getVariantInventory, createSalesOrder };

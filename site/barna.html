@@ -149,7 +149,6 @@
             font-size="20" fill="#0a0a0a" letter-spacing="2">III</text>
     </svg>
     <h3>Third Kit — Barna</h3>
-    <p class="fit">Sama treyjan, í barnastærðum. Sama svart og gull — fyrir næstu kynslóð.</p>
     <div class="price" id="price">—</div>
     <div class="size-label">Veldu stærð</div>
     <div class="size-select" id="sizes">
@@ -204,7 +203,7 @@
 
   /* Ef komið til baka af því að stærðin seldist upp á meðan */
   if(new URLSearchParams(location.search).get("soldout") === "1"){
-    document.querySelector(".fit").insertAdjacentHTML("afterend",
+    document.querySelector(".price").insertAdjacentHTML("beforebegin",
       '<p style="color:var(--gold-bright);font-size:.8rem;margin-top:10px;letter-spacing:.06em">Því miður seldist þessi stærð upp — veldu aðra stærð.</p>');
   }
 

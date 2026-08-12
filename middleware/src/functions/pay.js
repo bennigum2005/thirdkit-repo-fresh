@@ -1,24 +1,13 @@
 const { app } = require("@azure/functions");
 const crypto = require("crypto");
 const { itemMap, getVariantInventory } = require("../bc");
+const { createCheckout, updateCheckout } = require("../verifone");
 
 /**
- * GET /api/pay?product=adult&size=M
+ * GET /api/pay?product=adult&size=M&qty=1
  *
- * Called by the "Setja í körfu" button on the website. Builds a signed
- * payment request and redirects the customer to the Valitor (Rapyd)
- * Web Payments Page. Price is decided HERE (server-side, from the PRICES
- * env var) — never by the browser.
- *
- * Extra environment variables (in addition to the BC ones):
- *   VALITOR_MERCHANT_ID        - MerchantID from Valitor/Rapyd
- *   VALITOR_VERIFICATION_CODE  - VerificationCode from Valitor/Rapyd (secret!)
- *   VALITOR_PAGE_URL           - Payment page URL. Test/UAT vs production —
- *                                confirm exact URLs with Valitor when you get
- *                                the merchant agreement.
- *   PRICES                     - JSON, prices in ISK: {"adult":9990,"kids":7990}
- *   SITE_BASE_URL              - e.g. "https://bennigum2005.github.io/thirdkit-repo-fresh"
- *   MIDDLEWARE_BASE_URL        - e.g. "https://thirdkit-func.azurewebsites.net"
+ * Called by the basket page. Creates a Verifone hosted checkout (price decided
+ * server-side from PRICES) and redirects the customer to Verifone's payment page.
  */
 app.http("pay", {
   methods: ["GET"],
@@ -49,53 +38,34 @@ app.http("pay", {
         context.warn("Stock pre-check failed, allowing purchase: " + e.message);
       }
 
-      // Reference number encodes product+size+qty so the callback can map it back.
-      // Format: TK-<product>-<size>-q<qty>-<unique>
+      // Reference encodes product+size+qty so confirmation can map it back.
       const unique = Date.now().toString(36) + crypto.randomBytes(3).toString("hex");
       const referenceNumber = `TK-${product}-${size}-q${qty}-${unique}`;
-
-      const merchantId = process.env.VALITOR_MERCHANT_ID;
-      const verificationCode = process.env.VALITOR_VERIFICATION_CODE;
-      const currency = "ISK";
-      const quantity = String(qty);
-      const discount = "0";
-      const priceStr = String(price);
-      const successUrl = `${process.env.SITE_BASE_URL}/takk.html`;
-      const serverSideUrl = `${process.env.MIDDLEWARE_BASE_URL}/api/valitor-callback`;
-      const cancelUrl = `${process.env.SITE_BASE_URL}/${productPage}`;
 
       const description =
         product === "kids"
           ? `Third Kit - Barna, staerd ${size}`
           : `Third Kit - Fullordins, staerd ${size}`;
 
-      // DigitalSignature per Valitor/Rapyd spec:
-      // VerificationCode + AuthorizationOnly + (Qty+Price+Discount per product)
-      // + MerchantID + ReferenceNumber + PaymentSuccessfulURL
-      // + PaymentSuccessfulServerSideURL + Currency
-      const signatureSeed =
-        verificationCode + "0" + quantity + priceStr + discount +
-        merchantId + referenceNumber + successUrl + serverSideUrl + currency;
-      const digitalSignature = crypto.createHash("sha256").update(signatureSeed, "utf8").digest("hex");
-
-      const params = new URLSearchParams({
-        MerchantID: merchantId,
-        AuthorizationOnly: "0",
-        ReferenceNumber: referenceNumber,
-        Currency: currency,
-        Product_1_Description: description,
-        Product_1_Quantity: quantity,
-        Product_1_Price: priceStr,
-        Product_1_Discount: discount,
-        PaymentSuccessfulURL: successUrl,
-        PaymentSuccessfulServerSideURL: serverSideUrl,
-        PaymentCancelledURL: cancelUrl,
-        DigitalSignature: digitalSignature,
+      const baseReturn = `${process.env.MIDDLEWARE_BASE_URL}/api/confirm?ref=${encodeURIComponent(referenceNumber)}`;
+      const checkout = await createCheckout({
+        amount: price * qty,
+        currency: "ISK",
+        reference: referenceNumber,
+        returnUrl: baseReturn,
+        description,
       });
 
-      const url = `${process.env.VALITOR_PAGE_URL}?${params.toString()}`;
-      context.log(`Redirecting to Valitor: ${referenceNumber}`);
-      return { status: 302, headers: { Location: url } };
+      // Bake the checkout id into the return URL so /api/confirm can verify
+      // the payment against Verifone's API when the customer comes back.
+      try {
+        await updateCheckout(checkout.id, { return_url: `${baseReturn}&cid=${encodeURIComponent(checkout.id)}` });
+      } catch (e) {
+        context.warn("Could not update return_url with checkout id: " + e.message);
+      }
+
+      context.log(`Created Verifone checkout ${checkout.id} for ${referenceNumber}`);
+      return { status: 302, headers: { Location: checkout.url } };
     } catch (err) {
       context.error(err);
       return { status: 500, body: "Villa kom upp við að stofna greiðslu." };

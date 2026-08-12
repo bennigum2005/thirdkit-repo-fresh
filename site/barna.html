@@ -178,7 +178,6 @@
      Settu greiðsluhlekk og verð hér að neðan.
      ===================================================== */
   const PRICE = "8.990 kr.";
-  const PAY_URL = "PASTE-PAY-URL";                      // t.d. "https://thirdkit-func.azurewebsites.net/api/pay"
   const AVAILABILITY_URL = "PASTE-AVAILABILITY-URL";    // t.d. "https://thirdkit-func.azurewebsites.net/api/availability"
   const PRODUCT_KEY = "kids";                           // lykillinn í ITEM_MAP í middleware
   /* ===================================================== */
@@ -194,11 +193,7 @@
   }
   function buy(){
     if(!selectedSize){ alert("Vinsamlegast veldu stærð fyrst."); return; }
-    if(!PAY_URL || PAY_URL.startsWith("PASTE")){
-      alert("Greiðslutenging hefur ekki verið sett upp — bættu PAY_URL við efst í <script> hlutanum.");
-      return;
-    }
-    window.location.href = PAY_URL + "?product=" + PRODUCT_KEY + "&size=" + encodeURIComponent(selectedSize);
+    window.location.href = "karfa.html?product=" + PRODUCT_KEY + "&size=" + encodeURIComponent(selectedSize);
   }
 
   /* Ef komið til baka af því að stærðin seldist upp á meðan */

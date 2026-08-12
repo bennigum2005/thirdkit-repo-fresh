@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Third Kit</title>
-<meta name="description" content="Third Kit — svart og gull. Veldu fullorðins eða barna útgáfu.">
+<meta name="description" content="Third Kit — svart og gull. Fullorðins- og barnastærðir.">
 <style>
   :root{
     --black:#0a0a0a;
@@ -19,7 +19,9 @@
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%}
   body{
-    background:var(--black);
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(212,175,55,.10), transparent 70%),
+      var(--black);
     color:var(--text);
     font-family:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
     -webkit-font-smoothing:antialiased;
@@ -33,57 +35,79 @@
     backdrop-filter:blur(12px);
     border-bottom:1px solid rgba(212,175,55,.18);
   }
-  .logo{
-    font-size:1.35rem;font-weight:800;letter-spacing:.28em;
-    text-transform:uppercase;color:var(--text);text-decoration:none;
-  }
-  .logo span{color:var(--gold)}
   .logo img{height:56px;display:block}
 
-  .front{
+  .shop{
     height:100vh;height:100dvh;overflow:hidden;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;padding:80px 6vw 50px;
+    display:flex;align-items:center;justify-content:center;
+    padding:90px 6vw 50px;
     animation:fade .45s ease;
-    background:
-      radial-gradient(ellipse 60% 45% at 50% 0%, rgba(212,175,55,.12), transparent 70%),
-      var(--black);
   }
   @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-  .front .rule{
-    width:90px;height:2px;margin:24px auto;
-    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  .wrap{
+    display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,6vw,80px);
+    align-items:center;max-width:1020px;width:100%;
   }
-  .choices{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-    gap:32px;width:min(940px,100%);margin:10px auto 0;
-  }
-  .choice{
+  .visual{
+    display:flex;align-items:center;justify-content:center;
     background:linear-gradient(180deg,var(--black-3),var(--black-2));
-    border:1px solid rgba(212,175,55,.25);
-    border-radius:6px;padding:clamp(30px,7vh,64px) 34px;
-    cursor:pointer;position:relative;overflow:hidden;
-    transition:transform .25s ease, box-shadow .25s ease, border-color .25s;
-    text-decoration:none;color:var(--text);display:block;
+    border:1px solid rgba(212,175,55,.22);border-radius:8px;
+    padding:clamp(20px,5vh,50px);position:relative;overflow:hidden;
   }
-  .choice::before{
+  .visual::before{
     content:"";position:absolute;top:0;left:0;right:0;height:3px;
     background:linear-gradient(90deg,transparent,var(--gold),transparent);
   }
-  .choice:hover{
-    transform:translateY(-6px);
-    border-color:var(--gold);
-    box-shadow:0 24px 60px rgba(0,0,0,.6), 0 0 40px rgba(212,175,55,.14);
+  .visual svg{
+    width:clamp(180px,36vh,330px);height:auto;
+    filter:drop-shadow(0 16px 36px rgba(0,0,0,.55));
   }
-  .choice .box-icon{width:clamp(110px,22vh,170px);height:auto;margin:0 auto 20px;display:block}
-  .choice h2{
-    font-size:1.75rem;text-transform:uppercase;letter-spacing:.14em;font-weight:800;
+  .info{text-align:left}
+  .info h1{
+    font-size:clamp(1.9rem,4.4vh,2.7rem);font-weight:800;
+    letter-spacing:.08em;text-transform:uppercase;
   }
-  .choice p{color:var(--muted);font-size:.95rem;margin-top:12px;letter-spacing:.06em}
-  .choice .go{
-    display:inline-block;margin-top:22px;color:var(--gold);
-    font-size:.75rem;font-weight:700;letter-spacing:.26em;text-transform:uppercase;
+  .price{
+    font-size:1.55rem;font-weight:800;color:var(--gold-bright);
+    margin:10px 0 4px;letter-spacing:.04em;
   }
+  .pick-label{
+    margin:20px 0 10px;font-size:.72rem;font-weight:700;
+    letter-spacing:.26em;text-transform:uppercase;color:var(--muted);
+  }
+  .pills{display:flex;gap:12px;flex-wrap:wrap}
+  .pills button{
+    background:var(--black-2);color:var(--text);
+    border:1.5px solid rgba(255,255,255,.22);border-radius:14px;
+    min-width:74px;padding:16px 20px;cursor:pointer;
+    font-size:.95rem;font-weight:700;letter-spacing:.08em;
+    font-family:inherit;transition:all .15s ease;
+  }
+  .pills button:hover{border-color:var(--gold-dim);color:var(--gold-bright)}
+  .pills button.selected{
+    background:linear-gradient(120deg,var(--gold),var(--gold-bright));
+    color:#0a0a0a;border-color:var(--gold-bright);font-weight:800;
+    box-shadow:0 6px 18px rgba(212,175,55,.28);
+  }
+  .pills button:disabled{
+    opacity:.32;text-decoration:line-through;cursor:not-allowed;
+    border-color:rgba(255,255,255,.1);color:var(--muted);
+  }
+  .soldout-note{
+    color:var(--gold-bright);font-size:.8rem;margin-top:14px;letter-spacing:.06em;
+    display:none;
+  }
+  .btn{
+    display:inline-block;width:100%;padding:16px 38px;margin-top:26px;
+    font-size:.85rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+    text-decoration:none;cursor:pointer;border-radius:14px;border:1px solid var(--gold-bright);
+    background:linear-gradient(120deg,var(--gold),var(--gold-bright));color:#0a0a0a;
+    transition:transform .18s ease, box-shadow .18s ease;
+    font-family:inherit;
+  }
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(212,175,55,.35)}
+  .secure{margin-top:12px;font-size:.7rem;color:var(--muted);letter-spacing:.08em}
+
   footer{
     position:fixed;bottom:0;left:0;right:0;z-index:40;
     text-align:center;padding:12px 6vw;color:var(--muted);font-size:.68rem;
@@ -91,6 +115,15 @@
   }
   footer a{color:var(--gold);text-decoration:none;pointer-events:auto}
   footer a:hover{color:var(--gold-bright)}
+
+  @media (max-width:760px){
+    .shop{padding:86px 6vw 44px}
+    .wrap{grid-template-columns:1fr;gap:18px;max-width:420px}
+    .visual{padding:14px}
+    .visual svg{width:clamp(120px,20vh,190px)}
+    .info{text-align:center}
+    .pills{justify-content:center}
+  }
 
   /* Intro video overlay */
   #intro{
@@ -116,12 +149,10 @@
   <a class="logo" href="index.html"><img src="logo.png" alt="Third Kit"></a>
 </header>
 
-<section class="front">
-  <div class="rule"></div>
-
-  <div class="choices">
-    <a class="choice" href="fullordins.html">
-      <svg class="box-icon" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<section class="shop">
+  <div class="wrap">
+    <div class="visual">
+      <svg id="jersey-adult" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path d="M62 28 L84 18 Q100 30 116 18 L138 28 L172 52 L156 82 L142 72 L142 176 Q100 188 58 176 L58 72 L44 82 L28 52 Z"
               fill="#161616" stroke="#d4af37" stroke-width="3" stroke-linejoin="round"/>
         <path d="M84 18 Q100 30 116 18 Q112 34 100 34 Q88 34 84 18Z" fill="#d4af37"/>
@@ -130,13 +161,7 @@
         <text x="100" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold"
               font-size="20" fill="#f0cf5d" letter-spacing="2">III</text>
       </svg>
-      <h2>Fullorðins</h2>
-      <p>Stærðir XS–XXL</p>
-      <span class="go">Skoða →</span>
-    </a>
-
-    <a class="choice" href="barna.html">
-      <svg class="box-icon" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <svg id="jersey-kids" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:none">
         <path d="M62 28 L84 18 Q100 30 116 18 L138 28 L172 52 L156 82 L142 72 L142 176 Q100 188 58 176 L58 72 L44 82 L28 52 Z"
               fill="#d4af37" stroke="#f0cf5d" stroke-width="3" stroke-linejoin="round"/>
         <path d="M84 18 Q100 30 116 18 Q112 34 100 34 Q88 34 84 18Z" fill="#161616"/>
@@ -145,10 +170,25 @@
         <text x="100" y="82" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold"
               font-size="20" fill="#0a0a0a" letter-spacing="2">III</text>
       </svg>
-      <h2>Barna</h2>
-      <p>Stærðir 128–176</p>
-      <span class="go">Skoða →</span>
-    </a>
+    </div>
+
+    <div class="info">
+      <h1>Third Kit</h1>
+      <div class="price" id="price">—</div>
+
+      <div class="pick-label">Veldu útgáfu</div>
+      <div class="pills" id="cats">
+        <button data-cat="adult" onclick="pickCat('adult')">Fullorðins</button>
+        <button data-cat="kids" onclick="pickCat('kids')">Barna</button>
+      </div>
+
+      <div class="pick-label">Veldu stærð</div>
+      <div class="pills" id="sizes"></div>
+      <p class="soldout-note" id="soldout">Því miður seldist þessi stærð upp — veldu aðra stærð.</p>
+
+      <button class="btn" onclick="buy()">Setja í körfu</button>
+      <p class="secure">Þú verður send/ur áfram á örugga greiðslusíðu</p>
+    </div>
   </div>
 </section>
 
@@ -162,17 +202,82 @@
 </div>
 
 <script>
+  /* =====================================================
+     EDIT THIS BLOCK ONLY
+     ===================================================== */
+  const AVAILABILITY_URL = "PASTE-AVAILABILITY-URL"; // t.d. "https://thirdkit-func.azurewebsites.net/api/availability"
+  const PRODUCTS = {
+    adult: { label: "Fullorðins", price: "9.990 kr.", sizes: ["XS","S","M","L","XL","XXL"] },
+    kids:  { label: "Barna",      price: "8.990 kr.", sizes: ["128","140","152","164","176"] }
+  };
+  /* ===================================================== */
+
+  const params = new URLSearchParams(location.search);
+  let cat = params.get("product") === "kids" ? "kids" : "adult";
+  let selectedSize = null;
+  let stock = null; // fyllist frá availability-endapunktinum
+
+  function pickCat(c){
+    cat = c;
+    selectedSize = null;
+    render();
+  }
+  function pickSize(size, el){
+    if (el.disabled) return;
+    selectedSize = size;
+    render();
+  }
+  function render(){
+    document.getElementById("price").textContent = PRODUCTS[cat].price;
+    document.getElementById("jersey-adult").style.display = cat === "adult" ? "" : "none";
+    document.getElementById("jersey-kids").style.display  = cat === "kids"  ? "" : "none";
+    document.querySelectorAll("#cats button").forEach(b =>
+      b.classList.toggle("selected", b.dataset.cat === cat));
+
+    const wrap = document.getElementById("sizes");
+    wrap.innerHTML = "";
+    for (const size of PRODUCTS[cat].sizes){
+      const b = document.createElement("button");
+      b.textContent = size;
+      const out = stock && (stock[cat]?.[size] ?? 0) <= 0;
+      if (out){ b.disabled = true; b.title = "Uppselt"; }
+      if (selectedSize === size && !out) b.classList.add("selected");
+      b.onclick = () => pickSize(size, b);
+      wrap.appendChild(b);
+    }
+  }
+  function buy(){
+    if (!selectedSize){ alert("Vinsamlegast veldu stærð fyrst."); return; }
+    location.href = "karfa.html?product=" + cat + "&size=" + encodeURIComponent(selectedSize);
+  }
+
+  if (params.get("soldout") === "1"){
+    document.getElementById("soldout").style.display = "block";
+  }
+
+  /* Lifandi lagerstaða úr Business Central (gegnum middleware) */
+  async function loadAvailability(){
+    if (!AVAILABILITY_URL || AVAILABILITY_URL.startsWith("PASTE")) return;
+    try{
+      const res = await fetch(AVAILABILITY_URL);
+      if (!res.ok) return;
+      stock = await res.json();
+      if (selectedSize && (stock[cat]?.[selectedSize] ?? 0) <= 0) selectedSize = null;
+      render();
+    }catch(e){ /* engin tenging — allar stærðir haldast virkar */ }
+  }
+
+  render();
+  loadAvailability();
+
+  /* Intro-myndbandið: spilast einu sinni í hverri heimsókn */
   (function(){
     const intro = document.getElementById("intro");
     const video = document.getElementById("introVideo");
     let ended = false;
-
-    // Spilast einu sinni í hverri heimsókn — ekki aftur þegar smellt er
-    // "Til baka" af vörusíðu í sömu lotu
     let seen = false;
     try { seen = sessionStorage.getItem("tk-intro") === "1"; } catch(e){}
     if (seen) { intro.remove(); return; }
-
     window.endIntro = function(){
       if (ended) return;
       ended = true;
@@ -180,13 +285,10 @@
       intro.classList.add("fade");
       setTimeout(() => intro.remove(), 2100);
     };
-
     video.addEventListener("ended", endIntro);
     video.addEventListener("error", endIntro);
-    // Ef vafrinn neitar að spila (t.d. gagnasparnaður) — sleppa intro-inu
     const p = video.play();
     if (p && p.catch) p.catch(endIntro);
-    // Öryggisnet: aldrei fastur á intro-inu
     setTimeout(endIntro, 12000);
   })();
 </script>

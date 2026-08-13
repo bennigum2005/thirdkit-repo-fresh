@@ -45,6 +45,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "NO_SHIPPING_METHODS" }, { status: 422 });
     }
     console.error(err);
-    return Response.json({ error: "CHECKOUT_FAILED" }, { status: 502 });
+    return Response.json({ error: "CHECKOUT_FAILED", detail: msg.slice(0, 600) }, { status: 502 });
   }
 }

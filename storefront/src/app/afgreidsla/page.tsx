@@ -61,7 +61,7 @@ export default function CheckoutPage() {
           data.error === "NO_SHIPPING_METHODS" ? "Heimilisfangið virðist ekki gilt — athugaðu póstnúmer og stað." :
           data.error === "INVALID_EMAIL" ? "Netfangið lítur ekki rétt út." :
           data.error === "MISSING_FIELD" ? "Það vantar í reitina — fylltu alla út." :
-          "Eitthvað fór úrskeiðis — reyndu aftur."
+          "Eitthvað fór úrskeiðis — reyndu aftur." + (data.detail ? " [" + data.detail + "]" : "")
         );
         return;
       }

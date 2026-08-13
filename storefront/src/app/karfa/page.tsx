@@ -1,8 +1,10 @@
 "use client";
-// Cart page — reads the real Magento cart through /api/cart. Totals shown here
-// are display only; the amount charged is computed server-side (course ch. 7).
+// Cart page — reached ONLY via the cart icon. Reads the real Magento cart
+// through /api/cart. Totals shown are display only; the amount charged is
+// computed server-side (course ch. 7).
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type CartItem = {
   uid: string;
@@ -17,6 +19,7 @@ type Cart = { id: string; items: CartItem[]; grandTotal: number; currency: strin
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 
 export default function CartPage() {
+  const router = useRouter();
   const [cart, setCart] = useState<Cart | null>(null);
   const [error, setError] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -43,6 +46,7 @@ export default function CartPage() {
         body: JSON.stringify(body),
       });
       await load();
+      window.dispatchEvent(new Event("tk-cart-changed"));
     } finally {
       setBusy(false);
     }
@@ -51,7 +55,7 @@ export default function CartPage() {
   return (
     <section className="flex-1 flex flex-col items-center justify-center px-[6vw] pt-24 pb-14 text-center">
       <Link href="/" className="mb-4 text-[0.75rem] tracking-[0.22em] uppercase" style={{ color: "var(--muted)" }}>
-        ← Bæta við fleiri vörum
+        ← Halda áfram að versla
       </Link>
 
       <div
@@ -80,9 +84,11 @@ export default function CartPage() {
               style={{ borderColor: "rgba(255,255,255,.08)" }}>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-[0.9rem]">{item.name}</div>
-                <div className="text-[0.75rem] tracking-[0.1em] mt-0.5" style={{ color: "var(--muted)" }}>
-                  Stærð {item.sizeLabel}
-                </div>
+                {item.sizeLabel && (
+                  <div className="text-[0.75rem] tracking-[0.1em] mt-0.5" style={{ color: "var(--muted)" }}>
+                    Stærð {item.sizeLabel}
+                  </div>
+                )}
               </div>
               <span className="flex items-center gap-2">
                 <button disabled={busy || item.quantity <= 1}
@@ -120,8 +126,8 @@ export default function CartPage() {
         </label>
 
         <button className="btn-gold w-full" disabled={!cart?.items.length || !accepted}
-          onClick={() => alert("Greiðsluhluti (kafli 7) tengist þegar sandbox-lyklarnir eru komnir.")}>
-          Greiða
+          onClick={() => router.push("/afgreidsla")}>
+          Ganga frá pöntun
         </button>
         <p className="mt-2.5 text-[0.7rem] tracking-[0.08em]" style={{ color: "var(--muted)" }}>
           Greiðslan fer fram á öruggri greiðslusíðu

@@ -1,7 +1,8 @@
 // src/lib/checkoutFinalize.ts — server only.
-// Steps 3–8 of placing an order (course ch. 6), in ONE function so every
-// payment path behaves identically. Called from the payment webhook when
-// chapter 7 is wired up — never from the browser.
+// Placing an order is a sequence (course ch. 6). Steps 3–7 run at checkout
+// time in prepareCheckout(); step 8 (placeOrder) runs ONLY after payment is
+// confirmed — on the webhook path (course ch. 7) — via placeFinalOrder().
+// Every payment path must go through these two functions, no copies.
 import "server-only";
 import { magentoClient } from "./magentoClient";
 
@@ -13,19 +14,21 @@ export type CheckoutForm = {
   city: string;
   postalCode: string;
   phone: string;
-  regionId?: number;
 };
 
-export type FinalizeResult = { orderNumber: string | null };
+export type CheckoutSummary = {
+  grandTotal: number;
+  currency: string;
+  shipping: { carrier: string; method: string; title: string; amount: number };
+  paymentMethods: Array<{ code: string; title: string }>;
+  paymentSet: string | null;
+};
 
-export async function finalizeCheckout(
-  cartId: string,
-  form: CheckoutForm,
-  paymentCode: string
-): Promise<FinalizeResult> {
+/** Steps 3–7: make the cart "ready to place". Returns server-computed totals. */
+export async function prepareCheckout(cartId: string, form: CheckoutForm): Promise<CheckoutSummary> {
   const client = magentoClient();
 
-  // 3 · guest email
+  // 3 · guest email — a guest order needs somewhere to send the confirmation
   await client.request(
     /* GraphQL */ `
       mutation setGuestEmail($cartId: String!, $email: String!) {
@@ -34,17 +37,16 @@ export async function finalizeCheckout(
         }
       }
     `,
-    { cartId, email: form.email }
+    { cartId, email: form.email.trim() }
   );
 
-  // 4 · shipping address
+  // 4 · shipping address — an address object inside an array, country is ISO
   const addr = {
     address: {
       firstname: form.firstName.trim(),
       lastname: form.lastName.trim(),
       street: [form.address.trim()],
       city: form.city.trim(),
-      ...(form.regionId ? { region_id: form.regionId } : {}),
       postcode: form.postalCode.trim(),
       telephone: form.phone.trim(),
       country_code: "IS",
@@ -73,14 +75,16 @@ export async function finalizeCheckout(
     { cartId, addr }
   );
 
-  // 6 · shipping method — ask first, then set; fall back to the cheapest and log
+  // 6 · shipping method — ask what is available first, then set one
   type Methods = {
     cart: {
       shipping_addresses: Array<{
         available_shipping_methods: Array<{
           carrier_code: string;
           method_code: string;
-          amount: { value: number };
+          carrier_title: string;
+          method_title: string;
+          amount: { value: number; currency: string };
         }>;
       }>;
     };
@@ -91,7 +95,7 @@ export async function finalizeCheckout(
         cart(cart_id: $cartId) {
           shipping_addresses {
             available_shipping_methods {
-              carrier_code method_code
+              carrier_code method_code carrier_title method_title
               amount { value currency }
             }
           }
@@ -102,14 +106,15 @@ export async function finalizeCheckout(
   );
   const available = res.cart.shipping_addresses[0]?.available_shipping_methods ?? [];
   if (!available.length) {
-    // A real failure — usually a rejected address. Do not swallow it silently.
-    throw new Error(`No shipping methods available for cart ${cartId} — address likely rejected`);
+    // An empty list is a real failure — usually a rejected address (course ch. 6)
+    throw new Error("NO_SHIPPING_METHODS");
   }
-  const preferred =
-    available.find((m) => m.carrier_code === "flatrate") ??
+  const preferredCarrier = process.env.PREFERRED_CARRIER_CODE ?? "flatrate";
+  const chosen =
+    available.find((m) => m.carrier_code === preferredCarrier) ??
     [...available].sort((a, b) => a.amount.value - b.amount.value)[0];
-  if (preferred.carrier_code !== "flatrate") {
-    console.warn(`Shipping fallback used for cart ${cartId}: ${preferred.carrier_code}/${preferred.method_code}`);
+  if (chosen.carrier_code !== preferredCarrier) {
+    console.warn(`Shipping fallback used for cart ${cartId}: ${chosen.carrier_code}/${chosen.method_code}`);
   }
   await client.request(
     /* GraphQL */ `
@@ -120,23 +125,70 @@ export async function finalizeCheckout(
         }) { cart { id } }
       }
     `,
-    { cartId, carrier: preferred.carrier_code, method: preferred.method_code }
+    { cartId, carrier: chosen.carrier_code, method: chosen.method_code }
   );
 
-  // 7 · payment method (offline fallback code allowed on the webhook path —
-  //     the money is already taken, the order MUST be created)
-  await client.request(
+  // 7 · payment method — list what the cart offers; set one if configured.
+  //     Gateway methods can appear in the list and still be rejected by
+  //     setPaymentMethodOnCart — keep an offline fallback for the webhook path.
+  type Totals = {
+    cart: {
+      prices: { grand_total: { value: number; currency: string } };
+      available_payment_methods: Array<{ code: string; title: string }>;
+    };
+  };
+  const totals = await client.request<Totals>(
     /* GraphQL */ `
-      mutation setPayment($cartId: String!, $code: String!) {
-        setPaymentMethodOnCart(input: { cart_id: $cartId, payment_method: { code: $code } }) {
-          cart { id }
+      query totals($cartId: String!) {
+        cart(cart_id: $cartId) {
+          prices { grand_total { value currency } }
+          available_payment_methods { code title }
         }
       }
     `,
-    { cartId, code: paymentCode }
+    { cartId }
   );
+  const paymentMethods = totals.cart.available_payment_methods ?? [];
 
-  // 8 · place the order — read both schema shapes; a missing number is NOT a failure
+  let paymentSet: string | null = null;
+  const wanted = process.env.PAYMENT_METHOD_CODE;
+  const codeToSet =
+    (wanted && paymentMethods.find((m) => m.code === wanted)?.code) ??
+    paymentMethods.find((m) => ["checkmo", "banktransfer", "cashondelivery", "free"].includes(m.code))?.code;
+  if (codeToSet) {
+    try {
+      await client.request(
+        /* GraphQL */ `
+          mutation setPayment($cartId: String!, $code: String!) {
+            setPaymentMethodOnCart(input: { cart_id: $cartId, payment_method: { code: $code } }) {
+              cart { id }
+            }
+          }
+        `,
+        { cartId, code: codeToSet }
+      );
+      paymentSet = codeToSet;
+    } catch (e) {
+      console.warn(`setPaymentMethodOnCart rejected '${codeToSet}': ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  return {
+    grandTotal: totals.cart.prices.grand_total.value,
+    currency: totals.cart.prices.grand_total.currency,
+    shipping: {
+      carrier: chosen.carrier_code,
+      method: chosen.method_code,
+      title: `${chosen.carrier_title} — ${chosen.method_title}`,
+      amount: chosen.amount.value,
+    },
+    paymentMethods,
+    paymentSet,
+  };
+}
+
+/** Step 8: place the order. Called from the payment webhook — never the browser. */
+export async function placeFinalOrder(cartId: string): Promise<{ orderNumber: string | null }> {
   type PlaceRes = {
     placeOrder: {
       order?: { order_number?: string };
@@ -144,7 +196,7 @@ export async function finalizeCheckout(
       errors?: Array<{ message: string }>;
     };
   };
-  const placed = await client.request<PlaceRes>(
+  const placed = await magentoClient().request<PlaceRes>(
     /* GraphQL */ `
       mutation placeOrder($cartId: String!) {
         placeOrder(input: { cart_id: $cartId }) {
@@ -163,11 +215,9 @@ export async function finalizeCheckout(
     null;
 
   if (!orderNumber) {
-    // The order may exist without a number coming back — the caller should
-    // fall back to an admin API lookup by email within a short time window,
-    // NOT retry placeOrder (that would ship twice).
+    // Do NOT assume failure and do NOT retry placeOrder (it would ship twice).
+    // The safe move is an admin lookup by email within a short time window.
     console.error(`placeOrder returned no number for cart ${cartId} — verify via admin lookup`);
   }
-
   return { orderNumber };
 }

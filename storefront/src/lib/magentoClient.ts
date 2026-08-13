@@ -15,6 +15,7 @@ if (!endpoint) {
 export function magentoClient(customerToken?: string): GraphQLClient {
   return new GraphQLClient(endpoint ?? "http://magento-endpoint-not-configured", {
     headers: {
+      ...(process.env.MAGENTO_STORE_CODE ? { Store: process.env.MAGENTO_STORE_CODE } : {}),
       ...(customerToken ? { Authorization: `Bearer ${customerToken}` } : {}),
     },
     fetch: fetchWithProtection,

@@ -14,3 +14,6 @@ Thumbs.db
 dist/
 bin/
 obj/
+storefront/node_modules/
+storefront/.next/
+storefront/.env.local

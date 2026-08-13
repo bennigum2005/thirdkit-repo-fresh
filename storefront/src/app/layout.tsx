@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { CartButton } from "@/components/CartButton";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="is">
       <body className="min-h-dvh flex flex-col">
         <header
-          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-end px-[6vw] py-2.5 border-b"
+          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-[6vw] py-2.5 border-b"
           style={{
             background: "rgba(10,10,10,.82)",
             backdropFilter: "blur(12px)",
@@ -23,6 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/">
             <Image src="/logo.png" alt="Third Kit" width={56} height={56} className="h-14 w-auto" priority />
           </Link>
+          <div className="absolute right-[6vw]">
+            <CartButton />
+          </div>
         </header>
 
         <main className="flex-1 flex flex-col">{children}</main>

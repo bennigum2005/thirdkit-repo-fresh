@@ -7,6 +7,32 @@ import Link from "next/link";
 type CartItem = { uid: string; name: string; sizeLabel: string; quantity: number; rowTotal: number };
 type Cart = { items: CartItem[]; grandTotal: number };
 type Method = { carrier: string; method: string; title: string; amount: number };
+type DroppLocation = { id: string; name: string; address?: string };
+
+// Dropp's embeddable location picker (same integration as their official
+// WooCommerce/Shopify plugins): load the script, call chooseDroppLocation().
+const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
+
+function isDroppPickup(m: Method | null): boolean {
+  if (!m) return false;
+  const s = `${m.carrier} ${m.title}`.toLowerCase();
+  return s.includes("dropp") && !/heim|home/.test(s);
+}
+
+let droppScriptPromise: Promise<void> | null = null;
+function loadDroppScript(): Promise<void> {
+  if (droppScriptPromise) return droppScriptPromise;
+  droppScriptPromise = new Promise((resolve, reject) => {
+    const storeId = process.env.NEXT_PUBLIC_DROPP_STORE_ID;
+    const script = document.createElement("script");
+    script.src = storeId ? `${DROPP_SCRIPT}?data-store-id=${encodeURIComponent(storeId)}` : DROPP_SCRIPT;
+    if (storeId) script.setAttribute("data-store-id", storeId);
+    script.onload = () => resolve();
+    script.onerror = () => { droppScriptPromise = null; reject(new Error("dropp script failed")); };
+    document.body.appendChild(script);
+  });
+  return droppScriptPromise;
+}
 type Summary = {
   shipping: Method;
   grandTotal: number;
@@ -47,6 +73,7 @@ export default function CheckoutPage() {
   });
   const [methods, setMethods] = useState<Method[]>([]);
   const [picked, setPicked] = useState<Method | null>(null);
+  const [droppLoc, setDroppLoc] = useState<DroppLocation | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,12 +115,33 @@ export default function CheckoutPage() {
     }
   }
 
+  async function pickDroppLocation() {
+    setError(null);
+    try {
+      await loadDroppScript();
+      const w = window as unknown as { chooseDroppLocation?: () => Promise<DroppLocation | undefined> };
+      if (!w.chooseDroppLocation) throw new Error("chooseDroppLocation missing");
+      const loc = await w.chooseDroppLocation();
+      if (loc?.id) setDroppLoc({ id: loc.id, name: loc.name, address: loc.address });
+    } catch {
+      setError("Ekki tókst að opna Dropp-kortið — reyndu aftur.");
+    }
+  }
+
   async function confirmShipping() {
     if (!picked) return;
+    if (isDroppPickup(picked) && !droppLoc) {
+      setError("Veldu Dropp-afhendingarstað fyrst.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const data = await post({ ...form, shipping: { carrier: picked.carrier, method: picked.method } });
+      const data = await post({
+        ...form,
+        shipping: { carrier: picked.carrier, method: picked.method },
+        ...(isDroppPickup(picked) && droppLoc ? { droppLocation: droppLoc } : {}),
+      });
       setSummary(data);
       setStep("summary");
     } catch (data) {
@@ -203,9 +251,36 @@ export default function CheckoutPage() {
               })}
             </div>
 
+            {isDroppPickup(picked) && (
+              <div className="mt-5">
+                <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+                  Dropp-afhendingarstaður
+                </div>
+                {droppLoc ? (
+                  <div className="flex justify-between items-center rounded-xl px-4 py-3.5"
+                    style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)" }}>
+                    <span className="text-[0.9rem]">
+                      <span className="font-bold">{droppLoc.name}</span>
+                      {droppLoc.address && <span style={{ color: "var(--muted)" }}> — {droppLoc.address}</span>}
+                    </span>
+                    <button onClick={pickDroppLocation} className="text-[0.72rem] tracking-[0.16em] uppercase cursor-pointer"
+                      style={{ background: "none", border: "none", color: "var(--gold)" }}>
+                      Breyta
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={pickDroppLocation} className="w-full rounded-xl px-4 py-3.5 cursor-pointer font-bold text-[0.9rem]"
+                    style={{ background: "var(--black-2)", border: "1.5px dashed var(--gold-dim)", color: "var(--gold-bright)" }}>
+                    Veldu Dropp-afhendingarstað á korti
+                  </button>
+                )}
+              </div>
+            )}
+
             {error && <p className="mt-4 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
 
-            <button className="btn-gold w-full mt-6" onClick={confirmShipping} disabled={busy || !picked}>
+            <button className="btn-gold w-full mt-6" onClick={confirmShipping}
+              disabled={busy || !picked || (isDroppPickup(picked) && !droppLoc)}>
               {busy ? "Augnablik…" : "Áfram"}
             </button>
             <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
@@ -222,6 +297,12 @@ export default function CheckoutPage() {
               <span style={{ color: "var(--muted)" }}>Sending — {summary.shipping.title}</span>
               <span className="font-bold">{summary.shipping.amount === 0 ? "Frítt" : kr(summary.shipping.amount)}</span>
             </div>
+            {droppLoc && isDroppPickup(picked) && (
+              <div className="text-[0.85rem] py-1" style={{ color: "var(--muted)" }}>
+                Afhent í: <span style={{ color: "var(--text)" }}>{droppLoc.name}</span>
+                {droppLoc.address ? ` — ${droppLoc.address}` : ""}
+              </div>
+            )}
             <div className="flex justify-between items-center pt-3 mt-2 border-t" style={{ borderColor: "rgba(255,255,255,.08)" }}>
               <span className="text-[0.72rem] tracking-[0.2em] uppercase" style={{ color: "var(--muted)" }}>Samtals</span>
               <span className="font-extrabold text-2xl" style={{ color: "var(--gold-bright)" }}>

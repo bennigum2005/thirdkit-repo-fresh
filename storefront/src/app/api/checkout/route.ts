@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<CheckoutForm> & {
       shipping?: { carrier?: string; method?: string };
+      droppLocation?: { id?: string; name?: string; address?: string };
     };
 
     for (const field of REQUIRED) {
@@ -48,8 +49,14 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "EMPTY_CART" }, { status: 409 });
     }
 
-    // Steps 3–5 (idempotent — safe to run on both phases)
-    await setCustomerInfo(cartId, body as CheckoutForm);
+    // Steps 3–5 (idempotent — safe to run on both phases). A chosen Dropp
+    // location travels on the address so fulfilment sees it on the order.
+    const dropp = body.droppLocation;
+    const droppLine =
+      dropp?.id && dropp?.name
+        ? `Dropp: ${String(dropp.name)} (${String(dropp.id)})`
+        : undefined;
+    await setCustomerInfo(cartId, body as CheckoutForm, droppLine);
 
     // Step 6a — what does Magento offer for this cart and address?
     const methods = await getShippingMethods(cartId);

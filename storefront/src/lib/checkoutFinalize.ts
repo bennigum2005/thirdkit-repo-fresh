@@ -55,8 +55,9 @@ async function resolveRegionId(postcode: string): Promise<number | undefined> {
   return regionCache[isoRegionForPostcode(postcode)];
 }
 
-/** Steps 3–5: guest email, shipping address (region from postcode), billing. */
-export async function setCustomerInfo(cartId: string, form: CheckoutForm): Promise<void> {
+/** Steps 3–5: guest email, shipping address (region from postcode), billing.
+ *  extraStreetLine carries the chosen Dropp location onto the order address. */
+export async function setCustomerInfo(cartId: string, form: CheckoutForm, extraStreetLine?: string): Promise<void> {
   const client = magentoClient();
 
   await client.request(
@@ -75,7 +76,9 @@ export async function setCustomerInfo(cartId: string, form: CheckoutForm): Promi
     address: {
       firstname: form.firstName.trim(),
       lastname: form.lastName.trim(),
-      street: [form.address.trim()],
+      street: extraStreetLine
+        ? [form.address.trim(), extraStreetLine.slice(0, 120)]
+        : [form.address.trim()],
       city: form.city.trim(),
       ...(regionId ? { region_id: regionId } : {}),
       postcode: form.postalCode.trim(),

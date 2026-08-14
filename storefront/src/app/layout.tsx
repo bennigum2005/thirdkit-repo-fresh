@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { CartButton } from "@/components/CartButton";
+import { ErrorReporter } from "@/components/ErrorReporter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         <main className="flex-1 flex flex-col">{children}</main>
+        <ErrorReporter />
 
         <footer
           className="fixed bottom-0 left-0 right-0 z-40 text-center px-[6vw] py-3 text-[0.68rem] tracking-[0.14em] pointer-events-none"

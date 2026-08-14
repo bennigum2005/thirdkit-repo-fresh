@@ -161,6 +161,28 @@ export default function CheckoutPage() {
     }
   }
 
+  async function startPayment() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/pay", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(
+          data.error === "PAYMENT_METHOD_UNAVAILABLE"
+            ? "Engin greiðsluleið tiltæk á körfunni — láttu okkur vita."
+            : errorText(data)
+        );
+        return;
+      }
+      window.location.href = data.redirectUrl;
+    } catch {
+      setError("Eitthvað fór úrskeiðis — reyndu aftur.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const inputStyle = {
     background: "var(--black-2)",
     border: "1.5px solid rgba(255,255,255,.18)",
@@ -320,12 +342,12 @@ export default function CheckoutPage() {
               </span>
             </div>
             <p className="mt-5 text-[0.85rem] leading-relaxed" style={{ color: "var(--muted)" }}>
-              Pöntunin er tilbúin í Magento — allt sem vantar er greiðslan.
               {summary.paymentMethods.length > 0 &&
-                ` Greiðsluleiðir í boði: ${summary.paymentMethods.map((p) => p.title).join(", ")}.`}
+                `Greiðsluleiðir í boði: ${summary.paymentMethods.map((p) => p.title).join(", ")}.`}
             </p>
-            <button className="btn-gold w-full mt-5" disabled>
-              Greiða {kr(summary.grandTotal)}
+            {error && <p className="mt-3 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
+            <button className="btn-gold w-full mt-5" onClick={startPayment} disabled={busy}>
+              {busy ? "Augnablik…" : `Greiða ${kr(summary.grandTotal)}`}
             </button>
             <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
               style={{ background: "none", border: "none", color: "var(--muted)" }}

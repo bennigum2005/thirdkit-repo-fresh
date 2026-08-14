@@ -1,17 +1,17 @@
 "use client";
-// Checkout page (course practice step 5): collects everything a Magento order
-// needs and posts it to /api/checkout, which runs ch. 6 steps 3–7 server-side.
-// The totals shown afterwards come from Magento, never from this component.
+// Checkout page in three steps: info → delivery choice (Dropp & co., straight
+// from Magento) → summary. Totals always come from the server, never from here.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type CartItem = { uid: string; name: string; sizeLabel: string; quantity: number; rowTotal: number };
 type Cart = { items: CartItem[]; grandTotal: number };
+type Method = { carrier: string; method: string; title: string; amount: number };
 type Summary = {
+  shipping: Method;
   grandTotal: number;
   currency: string;
-  shipping: { title: string; amount: number };
-  paymentSet: string | null;
+  paymentMethods: Array<{ code: string; title: string }>;
 };
 
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
@@ -22,20 +22,34 @@ const FIELDS = [
   { key: "lastName", label: "Eftirnafn", type: "text", autoComplete: "family-name" },
   { key: "address", label: "Heimilisfang", type: "text", autoComplete: "street-address" },
   { key: "postalCode", label: "Póstnúmer", type: "text", autoComplete: "postal-code" },
-  { key: "city", label: "Staður", type: "text", autoComplete: "address-level2" },
+  { key: "city", label: "Sveitarfélag", type: "text", autoComplete: "address-level2" },
   { key: "phone", label: "Símanúmer", type: "tel", autoComplete: "tel" },
 ] as const;
 
 type FieldKey = (typeof FIELDS)[number]["key"];
 
+function errorText(data: { error?: string; detail?: string }): string {
+  switch (data.error) {
+    case "EMPTY_CART": return "Karfan er tóm — veldu vöru fyrst.";
+    case "NO_SHIPPING_METHODS": return "Heimilisfangið virðist ekki gilt — athugaðu póstnúmer og sveitarfélag.";
+    case "INVALID_EMAIL": return "Netfangið lítur ekki rétt út.";
+    case "MISSING_FIELD": return "Það vantar í reitina — fylltu alla út.";
+    case "INVALID_SHIPPING": return "Veldu afhendingarmáta aftur.";
+    default: return "Eitthvað fór úrskeiðis — reyndu aftur." + (data.detail ? ` [${data.detail}]` : "");
+  }
+}
+
 export default function CheckoutPage() {
+  const [step, setStep] = useState<"form" | "methods" | "summary">("form");
   const [cart, setCart] = useState<Cart | null>(null);
   const [form, setForm] = useState<Record<FieldKey, string>>({
     email: "", firstName: "", lastName: "", address: "", postalCode: "", city: "", phone: "",
   });
+  const [methods, setMethods] = useState<Method[]>([]);
+  const [picked, setPicked] = useState<Method | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
 
   useEffect(() => {
     fetch("/api/cart")
@@ -44,30 +58,46 @@ export default function CheckoutPage() {
       .catch(() => {});
   }, []);
 
-  async function submit(e: React.FormEvent) {
+  async function post(payload: object) {
+    const res = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw data;
+    return data;
+  }
+
+  async function submitInfo(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(
-          data.error === "EMPTY_CART" ? "Karfan er tóm — veldu vöru fyrst." :
-          data.error === "NO_SHIPPING_METHODS" ? "Heimilisfangið virðist ekki gilt — athugaðu póstnúmer og stað." :
-          data.error === "INVALID_EMAIL" ? "Netfangið lítur ekki rétt út." :
-          data.error === "MISSING_FIELD" ? "Það vantar í reitina — fylltu alla út." :
-          "Eitthvað fór úrskeiðis — reyndu aftur." + (data.detail ? " [" + data.detail + "]" : "")
-        );
-        return;
-      }
+      const data = await post(form);
+      const list: Method[] = data.methods;
+      setMethods(list);
+      // Preselect Dropp if Magento offers it, otherwise the cheapest option
+      const dropp = list.find((m) => `${m.carrier} ${m.title}`.toLowerCase().includes("dropp"));
+      setPicked(dropp ?? [...list].sort((a, b) => a.amount - b.amount)[0] ?? null);
+      setStep("methods");
+    } catch (data) {
+      setError(errorText(data as { error?: string; detail?: string }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmShipping() {
+    if (!picked) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await post({ ...form, shipping: { carrier: picked.carrier, method: picked.method } });
       setSummary(data);
-    } catch {
-      setError("Eitthvað fór úrskeiðis — reyndu aftur.");
+      setStep("summary");
+    } catch (data) {
+      setError(errorText(data as { error?: string; detail?: string }));
     } finally {
       setBusy(false);
     }
@@ -117,8 +147,8 @@ export default function CheckoutPage() {
           )}
         </div>
 
-        {!summary ? (
-          <form onSubmit={submit} className="text-left">
+        {step === "form" && (
+          <form onSubmit={submitInfo} className="text-left">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {FIELDS.map((f) => (
                 <label key={f.key} className={f.key === "email" || f.key === "address" ? "md:col-span-2" : ""}>
@@ -138,22 +168,59 @@ export default function CheckoutPage() {
               ))}
             </div>
 
-            {error && (
-              <p className="mt-4 text-[0.82rem] tracking-[0.04em]" style={{ color: "var(--gold-bright)" }}>{error}</p>
-            )}
+            {error && <p className="mt-4 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
 
             <button type="submit" className="btn-gold w-full mt-6" disabled={busy || !cart?.items.length}>
-              {busy ? "Augnablik…" : "Staðfesta upplýsingar"}
+              {busy ? "Augnablik…" : "Áfram í afhendingu"}
             </button>
-            <p className="mt-3 text-[0.7rem] text-center tracking-[0.08em]" style={{ color: "var(--muted)" }}>
-              Greiðslan sjálf fer fram á öruggri greiðslusíðu í næsta skrefi
-            </p>
           </form>
-        ) : (
+        )}
+
+        {step === "methods" && (
+          <div className="text-left">
+            <div className="mb-3 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+              Veldu afhendingarmáta
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {methods.map((m) => {
+                const selected = picked?.carrier === m.carrier && picked?.method === m.method;
+                return (
+                  <button
+                    key={`${m.carrier}-${m.method}`}
+                    onClick={() => setPicked(m)}
+                    className="flex justify-between items-center w-full rounded-xl px-4 py-3.5 cursor-pointer text-left"
+                    style={{
+                      background: selected ? "linear-gradient(120deg,var(--gold),var(--gold-bright))" : "var(--black-2)",
+                      color: selected ? "#0a0a0a" : "var(--text)",
+                      border: selected ? "1.5px solid var(--gold-bright)" : "1.5px solid rgba(255,255,255,.18)",
+                      fontWeight: selected ? 800 : 600,
+                    }}
+                  >
+                    <span className="text-[0.92rem]">{m.title}</span>
+                    <span className="text-[0.92rem]">{m.amount === 0 ? "Frítt" : kr(m.amount)}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && <p className="mt-4 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
+
+            <button className="btn-gold w-full mt-6" onClick={confirmShipping} disabled={busy || !picked}>
+              {busy ? "Augnablik…" : "Áfram"}
+            </button>
+            <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
+              style={{ background: "none", border: "none", color: "var(--muted)" }}
+              onClick={() => setStep("form")}>
+              ← Breyta upplýsingum
+            </button>
+          </div>
+        )}
+
+        {step === "summary" && summary && (
           <div className="text-left">
             <div className="flex justify-between text-[0.9rem] py-1.5">
               <span style={{ color: "var(--muted)" }}>Sending — {summary.shipping.title}</span>
-              <span className="font-bold">{kr(summary.shipping.amount)}</span>
+              <span className="font-bold">{summary.shipping.amount === 0 ? "Frítt" : kr(summary.shipping.amount)}</span>
             </div>
             <div className="flex justify-between items-center pt-3 mt-2 border-t" style={{ borderColor: "rgba(255,255,255,.08)" }}>
               <span className="text-[0.72rem] tracking-[0.2em] uppercase" style={{ color: "var(--muted)" }}>Samtals</span>
@@ -163,10 +230,16 @@ export default function CheckoutPage() {
             </div>
             <p className="mt-5 text-[0.85rem] leading-relaxed" style={{ color: "var(--muted)" }}>
               Pöntunin er tilbúin í Magento — allt sem vantar er greiðslan.
-              Greiðsluhlutinn tengist um leið og sandbox-lyklarnir eru komnir.
+              {summary.paymentMethods.length > 0 &&
+                ` Greiðsluleiðir í boði: ${summary.paymentMethods.map((p) => p.title).join(", ")}.`}
             </p>
             <button className="btn-gold w-full mt-5" disabled>
               Greiða {kr(summary.grandTotal)}
+            </button>
+            <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
+              style={{ background: "none", border: "none", color: "var(--muted)" }}
+              onClick={() => setStep("methods")}>
+              ← Breyta afhendingu
             </button>
           </div>
         )}

@@ -15,6 +15,7 @@ import {
   getTotalsAndPayments,
   type CheckoutForm,
 } from "@/lib/checkoutFinalize";
+import { checkCartStock } from "@/lib/stockCheck";
 
 const REQUIRED: Array<keyof CheckoutForm> = [
   "email", "firstName", "lastName", "address", "city", "postalCode", "phone",
@@ -77,6 +78,14 @@ export async function POST(request: NextRequest) {
     if (!chosen) {
       return Response.json({ error: "INVALID_SHIPPING" }, { status: 422 });
     }
+
+    // Practice step 7: stock check immediately before payment — an
+    // out-of-stock line blocks the flow with a clear message.
+    const stock = await checkCartStock(cartId);
+    if (!stock.ok) {
+      return Response.json({ error: "OUT_OF_STOCK", unavailable: stock.unavailable }, { status: 409 });
+    }
+
     await chooseShipping(cartId, chosen.carrier, chosen.method);
 
     const totals = await getTotalsAndPayments(cartId);

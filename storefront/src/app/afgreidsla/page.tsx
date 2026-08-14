@@ -54,7 +54,17 @@ const FIELDS = [
 
 type FieldKey = (typeof FIELDS)[number]["key"];
 
-function errorText(data: { error?: string; detail?: string }): string {
+function errorText(data: {
+  error?: string;
+  detail?: string;
+  unavailable?: Array<{ name: string; sizeLabel: string }>;
+}): string {
+  if (data.error === "OUT_OF_STOCK") {
+    const what = (data.unavailable ?? [])
+      .map((u) => `${u.name}${u.sizeLabel ? ` (${u.sizeLabel})` : ""}`)
+      .join(", ");
+    return `Því miður seldist upp á meðan: ${what || "vara í körfunni"}. Fjarlægðu línuna úr körfunni eða veldu aðra stærð.`;
+  }
   switch (data.error) {
     case "EMPTY_CART": return "Karfan er tóm — veldu vöru fyrst.";
     case "NO_SHIPPING_METHODS": return "Heimilisfangið virðist ekki gilt — athugaðu póstnúmer og sveitarfélag.";

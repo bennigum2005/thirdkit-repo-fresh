@@ -11,10 +11,48 @@ export type CheckoutForm = {
   firstName: string;
   lastName: string;
   address: string;
-  city: string;
+  city?: string; // derived from the postcode when not provided
   postalCode: string;
   phone: string;
 };
+
+/** Icelandic postcode → town, so the customer never types it. */
+const TOWNS: Array<[number, number, string]> = [
+  [100, 162, "Reykjavík"], [170, 172, "Seltjarnarnes"], [190, 191, "Vogar"],
+  [200, 206, "Kópavogur"], [210, 212, "Garðabær"], [220, 222, "Hafnarfjörður"],
+  [225, 225, "Garðabær"], [230, 235, "Reykjanesbær"], [240, 241, "Grindavík"],
+  [245, 251, "Suðurnesjabær"], [260, 262, "Reykjanesbær"], [270, 277, "Mosfellsbær"],
+  [300, 302, "Akranes"], [310, 312, "Borgarnes"], [320, 321, "Reykholt"],
+  [340, 342, "Stykkishólmur"], [345, 346, "Flatey"], [350, 351, "Grundarfjörður"],
+  [355, 356, "Snæfellsbær"], [360, 361, "Hellissandur"], [370, 371, "Búðardalur"],
+  [380, 381, "Reykhólahreppur"], [400, 401, "Ísafjörður"], [410, 411, "Hnífsdalur"],
+  [415, 416, "Bolungarvík"], [420, 421, "Súðavík"], [425, 426, "Flateyri"],
+  [430, 431, "Suðureyri"], [450, 451, "Patreksfjörður"], [460, 461, "Tálknafjörður"],
+  [465, 466, "Bíldudalur"], [470, 471, "Þingeyri"], [500, 531, "Hvammstangi"],
+  [540, 546, "Blönduós"], [550, 561, "Sauðárkrókur"], [565, 570, "Hofsós"],
+  [580, 581, "Siglufjörður"], [600, 607, "Akureyri"], [610, 616, "Grenivík"],
+  [620, 621, "Dalvík"], [625, 626, "Ólafsfjörður"], [630, 631, "Hrísey"],
+  [640, 641, "Húsavík"], [645, 661, "Laugar"], [670, 676, "Kópasker"],
+  [680, 686, "Þórshöfn"], [690, 691, "Vopnafjörður"], [700, 701, "Egilsstaðir"],
+  [710, 711, "Seyðisfjörður"], [715, 716, "Mjóifjörður"], [720, 721, "Borgarfjörður eystri"],
+  [730, 731, "Reyðarfjörður"], [735, 736, "Eskifjörður"], [740, 741, "Neskaupstaður"],
+  [750, 751, "Fáskrúðsfjörður"], [755, 756, "Stöðvarfjörður"], [760, 761, "Breiðdalsvík"],
+  [765, 766, "Djúpivogur"], [780, 781, "Höfn í Hornafirði"], [785, 786, "Öræfi"],
+  [800, 806, "Selfoss"], [810, 811, "Hveragerði"], [815, 816, "Þorlákshöfn"],
+  [820, 826, "Eyrarbakki"], [840, 846, "Flúðir"], [850, 851, "Hella"],
+  [860, 861, "Hvolsvöllur"], [870, 871, "Vík"], [880, 881, "Kirkjubæjarklaustur"],
+  [900, 903, "Vestmannaeyjar"],
+];
+
+export function townForPostcode(postcode: string): string {
+  const n = parseInt(postcode, 10);
+  if (!isNaN(n)) {
+    for (const [from, to, town] of TOWNS) {
+      if (n >= from && n <= to) return town;
+    }
+  }
+  return "Reykjavík";
+}
 
 export type ShippingMethod = {
   carrier: string;
@@ -72,6 +110,7 @@ export async function setCustomerInfo(cartId: string, form: CheckoutForm, extraS
   );
 
   const regionId = await resolveRegionId(form.postalCode.trim());
+  const city = form.city?.trim() || townForPostcode(form.postalCode.trim());
   const addr = {
     address: {
       firstname: form.firstName.trim(),
@@ -79,7 +118,7 @@ export async function setCustomerInfo(cartId: string, form: CheckoutForm, extraS
       street: extraStreetLine
         ? [form.address.trim(), extraStreetLine.slice(0, 120)]
         : [form.address.trim()],
-      city: form.city.trim(),
+      city,
       ...(regionId ? { region_id: regionId } : {}),
       postcode: form.postalCode.trim(),
       telephone: form.phone.trim(),

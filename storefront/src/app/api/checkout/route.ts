@@ -18,7 +18,7 @@ import {
 import { checkCartStock } from "@/lib/stockCheck";
 
 const REQUIRED: Array<keyof CheckoutForm> = [
-  "email", "firstName", "lastName", "address", "city", "postalCode", "phone",
+  "email", "firstName", "lastName", "address", "postalCode", "phone",
 ];
 
 export async function POST(request: NextRequest) {

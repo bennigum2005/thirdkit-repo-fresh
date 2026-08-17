@@ -48,7 +48,6 @@ const FIELDS = [
   { key: "lastName", label: "Eftirnafn", type: "text", autoComplete: "family-name" },
   { key: "address", label: "Heimilisfang", type: "text", autoComplete: "street-address" },
   { key: "postalCode", label: "Póstnúmer", type: "text", autoComplete: "postal-code" },
-  { key: "city", label: "Sveitarfélag", type: "text", autoComplete: "address-level2" },
   { key: "phone", label: "Símanúmer", type: "tel", autoComplete: "tel" },
 ] as const;
 
@@ -79,7 +78,7 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<"form" | "methods" | "summary">("form");
   const [cart, setCart] = useState<Cart | null>(null);
   const [form, setForm] = useState<Record<FieldKey, string>>({
-    email: "", firstName: "", lastName: "", address: "", postalCode: "", city: "", phone: "",
+    email: "", firstName: "", lastName: "", address: "", postalCode: "", phone: "",
   });
   const [methods, setMethods] = useState<Method[]>([]);
   const [picked, setPicked] = useState<Method | null>(null);

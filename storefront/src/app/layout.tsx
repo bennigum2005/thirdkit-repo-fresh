@@ -23,7 +23,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         >
           <Link href="/">
-            <Image src="/logo.png" alt="Third Kit" width={56} height={56} className="h-14 w-auto" priority />
+            <Image src="/logo.png" alt="Third Kit" width={56} height={56} priority
+              style={{ height: "56px", width: "auto" }} />
           </Link>
           <div className="absolute right-[6vw]">
             <CartButton />

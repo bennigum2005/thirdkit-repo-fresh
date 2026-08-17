@@ -14,25 +14,48 @@ type DroppLocation = { id: string; name: string; address?: string };
 const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
 
 // The visible delivery experience is Dropp (like joiutherji.is); the Magento
-// method underneath carries the price. We map raw methods to two options:
-// a Dropp pickup point (widget required) and in-store pickup.
-type DeliveryOption = { kind: "dropp" | "store"; label: string; method: Method };
+// method underneath carries the price. Raw methods map to three options:
+// Dropp pickup point (widget required), Dropp home delivery, in-store pickup.
+type DeliveryOption = { kind: "dropp" | "home" | "store"; label: string; method: Method };
 
 function buildOptions(methods: Method[]): DeliveryOption[] {
   const isStore = (m: Method) => /instore|pickup|verslun/i.test(`${m.carrier} ${m.method} ${m.title}`);
   const store = methods.find(isStore);
   const delivery = methods.filter((m) => !isStore(m));
-  // Prefer free shipping when Magento offers it, otherwise the cheapest
-  const preferred =
-    delivery.find((m) => /free/i.test(m.carrier)) ??
-    [...delivery].sort((a, b) => a.amount - b.amount)[0];
+  const free = delivery.find((m) => /free/i.test(m.carrier));
+  const cheapest = [...delivery].sort((a, b) => a.amount - b.amount)[0];
+  const paid = [...delivery].filter((m) => !/free/i.test(m.carrier)).sort((a, b) => a.amount - b.amount)[0];
+
+  const pickupMethod = free ?? cheapest; // free-over-threshold applies to Dropp points
+  const homeMethod = paid ?? cheapest;   // home delivery keeps its price
 
   const options: DeliveryOption[] = [];
-  if (preferred) options.push({ kind: "dropp", label: "Dropp — Dropp-stöð að eigin vali", method: preferred });
+  if (pickupMethod) options.push({ kind: "dropp", label: "Dropp afhendingarstaður", method: pickupMethod });
+  if (homeMethod) options.push({ kind: "home", label: "Dropp heimsending", method: homeMethod });
   if (store) options.push({ kind: "store", label: "Sækja í verslun Jóa útherja", method: store });
-  // Safety: never hide everything — fall back to the raw list
   if (!options.length) return methods.map((m) => ({ kind: "store" as const, label: m.title, method: m }));
   return options;
+}
+
+function OptionIcon({ kind }: { kind: DeliveryOption["kind"] }) {
+  const stroke = "currentColor";
+  if (kind === "dropp")
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 7h13v9H1zM14 10h4l4 3v3h-8" /><circle cx="6" cy="18" r="1.8" /><circle cx="18" cy="18" r="1.8" />
+      </svg>
+    );
+  if (kind === "home")
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" />
+      </svg>
+    );
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8h16l-1 4a3 3 0 0 1-3 2H8a3 3 0 0 1-3-2L4 8Z" /><path d="M5 14v6h14v-6" /><path d="M6 8 8 4h8l2 4" />
+    </svg>
+  );
 }
 
 let droppScriptPromise: Promise<void> | null = null;
@@ -271,8 +294,8 @@ export default function CheckoutPage() {
 
         {step === "methods" && (
           <div className="text-left">
-            <div className="mb-3 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
-              Veldu afhendingarmáta
+            <div className="mb-3 text-[0.95rem] font-bold" style={{ color: "var(--text)" }}>
+              Afhendingarmáti
             </div>
             <div className="flex flex-col gap-2.5">
               {options.map((o) => {
@@ -281,20 +304,37 @@ export default function CheckoutPage() {
                   <button
                     key={o.kind + o.method.carrier + o.method.method}
                     onClick={() => setPicked(o)}
-                    className="flex justify-between items-center w-full rounded-xl px-4 py-3.5 cursor-pointer text-left"
+                    className="flex items-center gap-3 w-full rounded-xl px-4 py-3.5 cursor-pointer text-left"
                     style={{
-                      background: selected ? "linear-gradient(120deg,var(--gold),var(--gold-bright))" : "var(--black-2)",
-                      color: selected ? "#0a0a0a" : "var(--text)",
-                      border: selected ? "1.5px solid var(--gold-bright)" : "1.5px solid rgba(255,255,255,.18)",
-                      fontWeight: selected ? 800 : 600,
+                      background: selected ? "rgba(212,175,55,.10)" : "var(--black-2)",
+                      color: "var(--text)",
+                      border: selected ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
                     }}
                   >
-                    <span className="text-[0.92rem]">{o.label}</span>
-                    <span className="text-[0.92rem]">{o.method.amount === 0 ? "Frítt" : kr(o.method.amount)}</span>
+                    <span className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center"
+                      style={{ border: selected ? "2px solid var(--gold)" : "2px solid rgba(255,255,255,.35)" }}>
+                      {selected && <span className="w-[9px] h-[9px] rounded-full" style={{ background: "var(--gold)" }} />}
+                    </span>
+                    <span className="flex-1 text-[0.95rem]" style={{ fontWeight: selected ? 700 : 500 }}>
+                      {o.label}
+                      <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>
+                        {o.method.amount === 0 ? "Frítt" : kr(o.method.amount)}
+                      </span>
+                    </span>
+                    {o.kind !== "store" && (
+                      <span className="font-extrabold lowercase text-[1.05rem] tracking-tight flex-shrink-0">dropp</span>
+                    )}
+                    <span className="flex-shrink-0" style={{ color: selected ? "var(--gold-bright)" : "var(--muted)" }}>
+                      <OptionIcon kind={o.kind} />
+                    </span>
                   </button>
                 );
               })}
             </div>
+            <p className="mt-3 text-[0.82rem] leading-relaxed" style={{ color: "var(--muted)" }}>
+              Ef þú verslar yfir {kr(Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD ?? 10000))} bjóðum
+              við þér að senda pakkann frítt á næsta Dropp afhendingarstað!
+            </p>
 
             {picked?.kind === "dropp" && (
               <div className="mt-5">

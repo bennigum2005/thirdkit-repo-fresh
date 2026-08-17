@@ -13,9 +13,11 @@ import {
   getShippingMethods,
   chooseShipping,
   getTotalsAndPayments,
+  isKnownPostcode,
   type CheckoutForm,
 } from "@/lib/checkoutFinalize";
 import { checkCartStock } from "@/lib/stockCheck";
+import { homeDeliveryAvailable } from "@/lib/dropp";
 
 const REQUIRED: Array<keyof CheckoutForm> = [
   "email", "firstName", "lastName", "address", "postalCode", "phone",
@@ -26,6 +28,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as Partial<CheckoutForm> & {
       shipping?: { carrier?: string; method?: string };
       droppLocation?: { id?: string; name?: string; address?: string };
+      deliveryKind?: string; // "dropp" | "home" | "store" — the UX-level choice
     };
 
     for (const field of REQUIRED) {
@@ -35,6 +38,11 @@ export async function POST(request: NextRequest) {
     }
     if (!/^\S+@\S+\.\S+$/.test(body.email!.trim())) {
       return Response.json({ error: "INVALID_EMAIL" }, { status: 400 });
+    }
+    // An address with a nonexistent postcode is not an address (Dropp resolves
+    // everything from the postcode, so this is the gate that matters).
+    if (!isKnownPostcode(body.postalCode!)) {
+      return Response.json({ error: "INVALID_POSTCODE" }, { status: 400 });
     }
 
     const cartId = await ensureCartId();
@@ -77,6 +85,18 @@ export async function POST(request: NextRequest) {
     );
     if (!chosen) {
       return Response.json({ error: "INVALID_SHIPPING" }, { status: 422 });
+    }
+
+    // Heimsending the way Dropp does it: the postcode must be on Dropp's own
+    // deliveryzips list, otherwise home delivery does not exist there.
+    if (body.deliveryKind === "home") {
+      const home = await homeDeliveryAvailable(body.postalCode!.trim());
+      if (home.known && !home.available) {
+        return Response.json(
+          { error: "HOME_DELIVERY_UNAVAILABLE", postcode: body.postalCode!.trim() },
+          { status: 422 }
+        );
+      }
     }
 
     // Practice step 7: stock check immediately before payment — an

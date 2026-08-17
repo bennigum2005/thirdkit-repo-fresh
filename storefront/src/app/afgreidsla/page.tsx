@@ -112,6 +112,9 @@ function errorText(data: {
     case "INVALID_EMAIL": return "Netfangið lítur ekki rétt út.";
     case "MISSING_FIELD": return "Það vantar í reitina — fylltu alla út.";
     case "INVALID_SHIPPING": return "Veldu afhendingarmáta aftur.";
+    case "INVALID_POSTCODE": return "Þetta póstnúmer er ekki til — athugaðu heimilisfangið.";
+    case "HOME_DELIVERY_UNAVAILABLE":
+      return "Dropp heimsending er ekki í boði fyrir þetta póstnúmer — veldu Dropp afhendingarstað í staðinn.";
     default: return "Eitthvað fór úrskeiðis — reyndu aftur." + (data.detail ? ` [${data.detail}]` : "");
   }
 }
@@ -128,6 +131,8 @@ export default function CheckoutPage() {
   const [droppList, setDroppList] = useState<DroppLocation[] | null>(null);
   const [droppListFailed, setDroppListFailed] = useState(false);
   const [droppQuery, setDroppQuery] = useState("");
+  // null = still checking; true/false = Dropp's deliveryzips answer
+  const [homeAvailable, setHomeAvailable] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,12 +165,27 @@ export default function CheckoutPage() {
       setOptions(opts);
       setPicked(opts[0] ?? null); // Dropp preselected
       setStep("methods");
+      // Dropp's own rule: heimsending only exists for postcodes on their
+      // deliveryzips list — grey the option out right away if not.
+      setHomeAvailable(null);
+      fetch(`/api/dropp-zips?postcode=${encodeURIComponent(form.postalCode.trim())}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((z) => setHomeAvailable(z ? Boolean(z.available) : true))
+        .catch(() => setHomeAvailable(true)); // never block on an outage
     } catch (data) {
       setError(errorText(data as { error?: string; detail?: string }));
     } finally {
       setBusy(false);
     }
   }
+
+  // If heimsending turns out not to exist for the postcode while it's the
+  // selected option, snap back to the Dropp pickup-point option.
+  useEffect(() => {
+    if (homeAvailable === false && picked?.kind === "home") {
+      setPicked(options.find((o) => o.kind === "dropp") ?? null);
+    }
+  }, [homeAvailable, picked, options]);
 
   // Load the full pickup-point list once, first time Dropp is the chosen kind.
   useEffect(() => {
@@ -208,6 +228,7 @@ export default function CheckoutPage() {
       const data = await post({
         ...form,
         shipping: { carrier: picked.method.carrier, method: picked.method.method },
+        deliveryKind: picked.kind,
         ...(picked.kind === "dropp" && droppLoc ? { droppLocation: droppLoc } : {}),
       });
       setSummary(data);
@@ -321,16 +342,20 @@ export default function CheckoutPage() {
             </div>
             <div className="flex flex-col gap-2.5">
               {options.map((o) => {
-                const selected = picked === o;
+                const disabled = o.kind === "home" && homeAvailable === false;
+                const selected = picked === o && !disabled;
                 return (
                   <button
                     key={o.kind + o.method.carrier + o.method.method}
-                    onClick={() => setPicked(o)}
-                    className="flex items-center gap-3 w-full rounded-xl px-4 py-3.5 cursor-pointer text-left"
+                    onClick={() => !disabled && setPicked(o)}
+                    disabled={disabled}
+                    className="flex items-center gap-3 w-full rounded-xl px-4 py-3.5 text-left"
                     style={{
                       background: selected ? "rgba(212,175,55,.10)" : "var(--black-2)",
                       color: "var(--text)",
                       border: selected ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
+                      opacity: disabled ? 0.45 : 1,
+                      cursor: disabled ? "not-allowed" : "pointer",
                     }}
                   >
                     <span className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center"
@@ -340,7 +365,9 @@ export default function CheckoutPage() {
                     <span className="flex-1 text-[0.95rem]" style={{ fontWeight: selected ? 700 : 500 }}>
                       {o.label}
                       <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>
-                        {o.method.amount === 0 ? "Frítt" : kr(o.method.amount)}
+                        {disabled
+                          ? `Ekki í boði fyrir póstnúmer ${form.postalCode.trim()}`
+                          : o.method.amount === 0 ? "Frítt" : kr(o.method.amount)}
                       </span>
                     </span>
                     {o.kind !== "store" && (

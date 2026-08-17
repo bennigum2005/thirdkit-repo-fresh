@@ -44,6 +44,14 @@ const TOWNS: Array<[number, number, string]> = [
   [900, 903, "Vestmannaeyjar"],
 ];
 
+/** Is this a postcode that actually exists in Iceland? (3 digits + in the table) */
+export function isKnownPostcode(postcode: string): boolean {
+  const pc = postcode.trim();
+  if (!/^\d{3}$/.test(pc)) return false;
+  const n = parseInt(pc, 10);
+  return TOWNS.some(([from, to]) => n >= from && n <= to);
+}
+
 export function townForPostcode(postcode: string): string {
   const n = parseInt(postcode, 10);
   if (!isNaN(n)) {

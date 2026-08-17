@@ -13,10 +13,26 @@ type DroppLocation = { id: string; name: string; address?: string };
 // WooCommerce/Shopify plugins): load the script, call chooseDroppLocation().
 const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
 
-function isDroppPickup(m: Method | null): boolean {
-  if (!m) return false;
-  const s = `${m.carrier} ${m.title}`.toLowerCase();
-  return s.includes("dropp") && !/heim|home/.test(s);
+// The visible delivery experience is Dropp (like joiutherji.is); the Magento
+// method underneath carries the price. We map raw methods to two options:
+// a Dropp pickup point (widget required) and in-store pickup.
+type DeliveryOption = { kind: "dropp" | "store"; label: string; method: Method };
+
+function buildOptions(methods: Method[]): DeliveryOption[] {
+  const isStore = (m: Method) => /instore|pickup|verslun/i.test(`${m.carrier} ${m.method} ${m.title}`);
+  const store = methods.find(isStore);
+  const delivery = methods.filter((m) => !isStore(m));
+  // Prefer free shipping when Magento offers it, otherwise the cheapest
+  const preferred =
+    delivery.find((m) => /free/i.test(m.carrier)) ??
+    [...delivery].sort((a, b) => a.amount - b.amount)[0];
+
+  const options: DeliveryOption[] = [];
+  if (preferred) options.push({ kind: "dropp", label: "Dropp — Dropp-stöð að eigin vali", method: preferred });
+  if (store) options.push({ kind: "store", label: "Sækja í verslun Jóa útherja", method: store });
+  // Safety: never hide everything — fall back to the raw list
+  if (!options.length) return methods.map((m) => ({ kind: "store" as const, label: m.title, method: m }));
+  return options;
 }
 
 let droppScriptPromise: Promise<void> | null = null;
@@ -80,8 +96,8 @@ export default function CheckoutPage() {
   const [form, setForm] = useState<Record<FieldKey, string>>({
     email: "", firstName: "", lastName: "", address: "", postalCode: "", phone: "",
   });
-  const [methods, setMethods] = useState<Method[]>([]);
-  const [picked, setPicked] = useState<Method | null>(null);
+  const [options, setOptions] = useState<DeliveryOption[]>([]);
+  const [picked, setPicked] = useState<DeliveryOption | null>(null);
   const [droppLoc, setDroppLoc] = useState<DroppLocation | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,11 +127,9 @@ export default function CheckoutPage() {
     setError(null);
     try {
       const data = await post(form);
-      const list: Method[] = data.methods;
-      setMethods(list);
-      // Preselect Dropp if Magento offers it, otherwise the cheapest option
-      const dropp = list.find((m) => `${m.carrier} ${m.title}`.toLowerCase().includes("dropp"));
-      setPicked(dropp ?? [...list].sort((a, b) => a.amount - b.amount)[0] ?? null);
+      const opts = buildOptions(data.methods as Method[]);
+      setOptions(opts);
+      setPicked(opts[0] ?? null); // Dropp preselected
       setStep("methods");
     } catch (data) {
       setError(errorText(data as { error?: string; detail?: string }));
@@ -139,7 +153,7 @@ export default function CheckoutPage() {
 
   async function confirmShipping() {
     if (!picked) return;
-    if (isDroppPickup(picked) && !droppLoc) {
+    if (picked.kind === "dropp" && !droppLoc) {
       setError("Veldu Dropp-afhendingarstað fyrst.");
       return;
     }
@@ -148,8 +162,8 @@ export default function CheckoutPage() {
     try {
       const data = await post({
         ...form,
-        shipping: { carrier: picked.carrier, method: picked.method },
-        ...(isDroppPickup(picked) && droppLoc ? { droppLocation: droppLoc } : {}),
+        shipping: { carrier: picked.method.carrier, method: picked.method.method },
+        ...(picked.kind === "dropp" && droppLoc ? { droppLocation: droppLoc } : {}),
       });
       setSummary(data);
       setStep("summary");
@@ -261,12 +275,12 @@ export default function CheckoutPage() {
               Veldu afhendingarmáta
             </div>
             <div className="flex flex-col gap-2.5">
-              {methods.map((m) => {
-                const selected = picked?.carrier === m.carrier && picked?.method === m.method;
+              {options.map((o) => {
+                const selected = picked === o;
                 return (
                   <button
-                    key={`${m.carrier}-${m.method}`}
-                    onClick={() => setPicked(m)}
+                    key={o.kind + o.method.carrier + o.method.method}
+                    onClick={() => setPicked(o)}
                     className="flex justify-between items-center w-full rounded-xl px-4 py-3.5 cursor-pointer text-left"
                     style={{
                       background: selected ? "linear-gradient(120deg,var(--gold),var(--gold-bright))" : "var(--black-2)",
@@ -275,14 +289,14 @@ export default function CheckoutPage() {
                       fontWeight: selected ? 800 : 600,
                     }}
                   >
-                    <span className="text-[0.92rem]">{m.title}</span>
-                    <span className="text-[0.92rem]">{m.amount === 0 ? "Frítt" : kr(m.amount)}</span>
+                    <span className="text-[0.92rem]">{o.label}</span>
+                    <span className="text-[0.92rem]">{o.method.amount === 0 ? "Frítt" : kr(o.method.amount)}</span>
                   </button>
                 );
               })}
             </div>
 
-            {isDroppPickup(picked) && (
+            {picked?.kind === "dropp" && (
               <div className="mt-5">
                 <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
                   Dropp-afhendingarstaður
@@ -311,7 +325,7 @@ export default function CheckoutPage() {
             {error && <p className="mt-4 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
 
             <button className="btn-gold w-full mt-6" onClick={confirmShipping}
-              disabled={busy || !picked || (isDroppPickup(picked) && !droppLoc)}>
+              disabled={busy || !picked || (picked.kind === "dropp" && !droppLoc)}>
               {busy ? "Augnablik…" : "Áfram"}
             </button>
             <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
@@ -325,10 +339,12 @@ export default function CheckoutPage() {
         {step === "summary" && summary && (
           <div className="text-left">
             <div className="flex justify-between text-[0.9rem] py-1.5">
-              <span style={{ color: "var(--muted)" }}>Sending — {summary.shipping.title}</span>
+              <span style={{ color: "var(--muted)" }}>
+                Sending — {picked?.kind === "dropp" ? "Dropp" : picked?.label ?? summary.shipping.title}
+              </span>
               <span className="font-bold">{summary.shipping.amount === 0 ? "Frítt" : kr(summary.shipping.amount)}</span>
             </div>
-            {droppLoc && isDroppPickup(picked) && (
+            {droppLoc && picked?.kind === "dropp" && (
               <div className="text-[0.85rem] py-1" style={{ color: "var(--muted)" }}>
                 Afhent í: <span style={{ color: "var(--text)" }}>{droppLoc.name}</span>
                 {droppLoc.address ? ` — ${droppLoc.address}` : ""}

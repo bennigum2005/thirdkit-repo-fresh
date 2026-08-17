@@ -1,10 +1,9 @@
 "use client";
-// The interactive island (course ch. 3): category + size pills, add to cart.
+// The interactive island (course ch. 3): category + size pills, qty, add to cart.
 // It is shipped to the browser, so it is never trusted with money — prices
 // shown here are display only; the charge is computed server-side from the
 // Magento cart.
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/products";
 
 type Props = { adult: Product; kids: Product; live: boolean };
@@ -33,11 +32,12 @@ function Jersey({ cat }: { cat: Cat }) {
 }
 
 export function ProductView({ adult, kids, live }: Props) {
-  const router = useRouter();
   const [cat, setCat] = useState<Cat>("adult");
   const [childSku, setChildSku] = useState<string | null>(null);
+  const [qty, setQty] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState(false);
 
   const product = cat === "adult" ? adult : kids;
   const selected = product.variants.find((v) => v.childSku === childSku) ?? null;
@@ -53,12 +53,15 @@ export function ProductView({ adult, kids, live }: Props) {
       const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku: selected.childSku, qty: 1 }),
+        body: JSON.stringify({ sku: selected.childSku, qty }),
       });
       if (!res.ok) throw new Error(await res.text());
-      router.push("/karfa");
+      setAdded(true);
+      window.dispatchEvent(new Event("tk-cart-changed"));
+      setTimeout(() => setAdded(false), 3000);
     } catch {
       setError("Ekki tókst að bæta í körfu — reyndu aftur.");
+    } finally {
       setBusy(false);
     }
   }
@@ -117,8 +120,23 @@ export function ProductView({ adult, kids, live }: Props) {
           </p>
         )}
 
-        <button className="btn-gold w-full mt-6" onClick={addToCart} disabled={busy}>
-          {busy ? "Augnablik…" : "Setja í körfu"}
+        <div className="mt-5 mb-2.5 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+          Magn
+        </div>
+        <div className="flex items-center gap-4 justify-center md:justify-start">
+          <button
+            className="w-10 h-10 rounded-xl text-lg cursor-pointer disabled:opacity-40"
+            style={{ border: "1px solid var(--gold-dim)", color: "var(--gold-bright)", background: "transparent" }}
+            onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1}>−</button>
+          <span className="min-w-6 text-center font-extrabold text-lg">{qty}</span>
+          <button
+            className="w-10 h-10 rounded-xl text-lg cursor-pointer disabled:opacity-40"
+            style={{ border: "1px solid var(--gold-dim)", color: "var(--gold-bright)", background: "transparent" }}
+            onClick={() => setQty((q) => Math.min(10, q + 1))} disabled={qty >= 10}>+</button>
+        </div>
+
+        <button className="btn-gold w-full mt-5" onClick={addToCart} disabled={busy}>
+          {busy ? "Augnablik…" : added ? "Komið í körfuna ✓" : "Setja í körfu"}
         </button>
         <p className="mt-3 text-[0.7rem] tracking-[0.08em]" style={{ color: "var(--muted)" }}>
           Þú verður send/ur áfram á örugga greiðslusíðu

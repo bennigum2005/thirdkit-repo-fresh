@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+// Cart icon for the header — shows how many items are in the Magento cart
+// and opens the cart page when clicked.
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -7,18 +9,22 @@ export function CartButton() {
   const [count, setCount] = useState<number | null>(null);
   const pathname = usePathname();
 
-  useEffect(() => {
-    let alive = true;
+  const refresh = useCallback(() => {
     fetch("/api/cart")
       .then((r) => (r.ok ? r.json() : null))
       .then((cart) => {
-        if (!alive || !cart) return;
+        if (!cart) return;
         type Item = { quantity: number };
         setCount((cart.items as Item[]).reduce((n, i) => n + i.quantity, 0));
       })
       .catch(() => {});
-    return () => { alive = false; };
-  }, [pathname]);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    window.addEventListener("tk-cart-changed", refresh);
+    return () => window.removeEventListener("tk-cart-changed", refresh);
+  }, [refresh, pathname]);
 
   return (
     <Link href="/karfa" aria-label="Karfa" className="relative inline-flex items-center">

@@ -9,18 +9,22 @@ type Cart = { items: CartItem[]; grandTotal: number };
 type Method = { carrier: string; method: string; title: string; amount: number };
 type DroppLocation = { id: string; name: string; address?: string };
 
+/** Accent-insensitive contains-match so „Skeifan" finnst með „skeifan". */
+function norm(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae");
+}
+
 // Dropp's embeddable location picker (same integration as their official
 // WooCommerce/Shopify plugins): load the script, call chooseDroppLocation().
 const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
 
 // The visible delivery experience is Dropp (like joiutherji.is); the Magento
-// method underneath carries the price. Raw methods map to three options:
-// Dropp pickup point (widget required), Dropp home delivery, in-store pickup.
+// method underneath carries the price. Raw methods map to two options:
+// Dropp pickup point (widget required) and Dropp home delivery.
 type DeliveryOption = { kind: "dropp" | "home" | "store"; label: string; method: Method };
 
 function buildOptions(methods: Method[]): DeliveryOption[] {
   const isStore = (m: Method) => /instore|pickup|verslun/i.test(`${m.carrier} ${m.method} ${m.title}`);
-  const store = methods.find(isStore);
   const delivery = methods.filter((m) => !isStore(m));
   const free = delivery.find((m) => /free/i.test(m.carrier));
   const cheapest = [...delivery].sort((a, b) => a.amount - b.amount)[0];
@@ -32,7 +36,6 @@ function buildOptions(methods: Method[]): DeliveryOption[] {
   const options: DeliveryOption[] = [];
   if (pickupMethod) options.push({ kind: "dropp", label: "Dropp afhendingarstaður", method: pickupMethod });
   if (homeMethod) options.push({ kind: "home", label: "Dropp heimsending", method: homeMethod });
-  if (store) options.push({ kind: "store", label: "Sækja í verslun Jóa útherja", method: store });
   if (!options.length) return methods.map((m) => ({ kind: "store" as const, label: m.title, method: m }));
   return options;
 }
@@ -122,6 +125,9 @@ export default function CheckoutPage() {
   const [options, setOptions] = useState<DeliveryOption[]>([]);
   const [picked, setPicked] = useState<DeliveryOption | null>(null);
   const [droppLoc, setDroppLoc] = useState<DroppLocation | null>(null);
+  const [droppList, setDroppList] = useState<DroppLocation[] | null>(null);
+  const [droppListFailed, setDroppListFailed] = useState(false);
+  const [droppQuery, setDroppQuery] = useState("");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +166,22 @@ export default function CheckoutPage() {
       setBusy(false);
     }
   }
+
+  // Load the full pickup-point list once, first time Dropp is the chosen kind.
+  useEffect(() => {
+    if (picked?.kind !== "dropp" || droppList !== null || droppListFailed) return;
+    fetch("/api/dropp-locations")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data) => setDroppList((data.locations ?? []) as DroppLocation[]))
+      .catch(() => setDroppListFailed(true)); // fall back to the map widget
+  }, [picked, droppList, droppListFailed]);
+
+  const droppMatches =
+    droppList && droppQuery.trim().length >= 2
+      ? droppList
+          .filter((l) => norm(`${l.name} ${l.address ?? ""}`).includes(norm(droppQuery.trim())))
+          .slice(0, 6)
+      : [];
 
   async function pickDroppLocation() {
     setError(null);
@@ -332,7 +354,7 @@ export default function CheckoutPage() {
               })}
             </div>
             <p className="mt-3 text-[0.82rem] leading-relaxed" style={{ color: "var(--muted)" }}>
-              Ef þú verslar yfir {kr(Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD ?? 10000))} bjóðum
+              Ef þú verslar yfir {kr(Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD ?? 15000))} bjóðum
               við þér að senda pakkann frítt á næsta Dropp afhendingarstað!
             </p>
 
@@ -348,16 +370,48 @@ export default function CheckoutPage() {
                       <span className="font-bold">{droppLoc.name}</span>
                       {droppLoc.address && <span style={{ color: "var(--muted)" }}> — {droppLoc.address}</span>}
                     </span>
-                    <button onClick={pickDroppLocation} className="text-[0.72rem] tracking-[0.16em] uppercase cursor-pointer"
+                    <button onClick={() => { setDroppLoc(null); setDroppQuery(""); }}
+                      className="text-[0.72rem] tracking-[0.16em] uppercase cursor-pointer"
                       style={{ background: "none", border: "none", color: "var(--gold)" }}>
                       Breyta
                     </button>
                   </div>
-                ) : (
+                ) : droppListFailed ? (
+                  // Location list unreachable — the map widget still works
                   <button onClick={pickDroppLocation} className="w-full rounded-xl px-4 py-3.5 cursor-pointer font-bold text-[0.9rem]"
                     style={{ background: "var(--black-2)", border: "1.5px dashed var(--gold-dim)", color: "var(--gold-bright)" }}>
                     Veldu Dropp-afhendingarstað á korti
                   </button>
+                ) : (
+                  <div>
+                    <input
+                      type="text"
+                      value={droppQuery}
+                      onChange={(e) => setDroppQuery(e.target.value)}
+                      placeholder={droppList === null ? "Sæki afhendingarstaði…" : "Leitaðu að heimilisfangi eða stað…"}
+                      disabled={droppList === null}
+                      className="w-full rounded-xl px-4 py-3.5 text-[0.95rem] outline-none focus:border-[var(--gold)]"
+                      style={inputStyle}
+                    />
+                    {droppQuery.trim().length >= 2 && (
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        {droppMatches.map((l) => (
+                          <button key={l.id}
+                            onClick={() => { setDroppLoc(l); setError(null); }}
+                            className="w-full rounded-xl px-4 py-3 text-left cursor-pointer text-[0.9rem]"
+                            style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.18)", color: "var(--text)" }}>
+                            <span className="font-bold">{l.name}</span>
+                            {l.address && <span style={{ color: "var(--muted)" }}> — {l.address}</span>}
+                          </button>
+                        ))}
+                        {!droppMatches.length && (
+                          <p className="text-[0.82rem] px-1" style={{ color: "var(--muted)" }}>
+                            Enginn afhendingarstaður fannst — prófaðu götuheiti eða bæjarfélag.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}

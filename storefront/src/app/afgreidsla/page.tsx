@@ -98,8 +98,15 @@ type FieldKey = (typeof FIELDS)[number]["key"];
 function errorText(data: {
   error?: string;
   detail?: string;
+  reason?: string;
+  postcode?: string;
   unavailable?: Array<{ name: string; sizeLabel: string }>;
 }): string {
+  if (data.error === "ADDRESS_NOT_FOUND") {
+    return data.reason === "NUMBER"
+      ? "Húsnúmerið finnst ekki við þessa götu — athugaðu heimilisfangið."
+      : `Þessi gata finnst ekki í póstnúmeri ${data.postcode ?? ""} — athugaðu heimilisfangið.`;
+  }
   if (data.error === "OUT_OF_STOCK") {
     const what = (data.unavailable ?? [])
       .map((u) => `${u.name}${u.sizeLabel ? ` (${u.sizeLabel})` : ""}`)
@@ -142,6 +149,8 @@ export default function CheckoutPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then(setCart)
       .catch(() => {});
+    // Warm the address registry so validation is instant when the form submits
+    fetch("/api/address-check?warm=1").catch(() => {});
   }, []);
 
   async function post(payload: object) {

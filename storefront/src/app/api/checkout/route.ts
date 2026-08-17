@@ -18,6 +18,7 @@ import {
 } from "@/lib/checkoutFinalize";
 import { checkCartStock } from "@/lib/stockCheck";
 import { homeDeliveryAvailable } from "@/lib/dropp";
+import { checkAddress } from "@/lib/addressRegistry";
 
 const REQUIRED: Array<keyof CheckoutForm> = [
   "email", "firstName", "lastName", "address", "postalCode", "phone",
@@ -43,6 +44,15 @@ export async function POST(request: NextRequest) {
     // everything from the postcode, so this is the gate that matters).
     if (!isKnownPostcode(body.postalCode!)) {
       return Response.json({ error: "INVALID_POSTCODE" }, { status: 400 });
+    }
+    // The address itself must exist in Staðfangaskrá (the official registry).
+    // A made-up street or house number stops here, before Magento sees it.
+    const addr = await checkAddress(body.address!, body.postalCode!);
+    if (addr.known && !addr.ok) {
+      return Response.json(
+        { error: "ADDRESS_NOT_FOUND", reason: addr.reason, postcode: body.postalCode!.trim() },
+        { status: 400 }
+      );
     }
 
     const cartId = await ensureCartId();

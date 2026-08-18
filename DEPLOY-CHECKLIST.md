@@ -20,6 +20,12 @@ reasoning as solid and the exact runtime behaviour as unconfirmed.
 **Important:** the build passing tells you nothing here. Every problem below is a
 runtime, configuration or design problem. A compiler cannot see any of them.
 
+**Ticking things off.** Every `- [ ]` below is yours to fill in. Change it to `- [x]`
+and commit. GitHub won't let you click them in a file view — you edit the file — and
+that's fine, because the commit is the record of when you did it and the diff shows
+what you wrote next to it. Section 7 at the end is the separate list of things that
+must be *proven* before deploying; those are ticked last.
+
 A few words used throughout:
 
 - **webhook** — the payment provider's server calling your server to say "this was paid".
@@ -36,9 +42,12 @@ a live Next.js storefront on headless Magento with both already working. Almost
 every problem below has already been answered there — in production, against real
 money.
 
-Start at `joi_web/docs/obsidian/Home.md`. The two notes that matter here are
-`payments/Verifone 3DS.md` and `payments/Dropp Delivery.md`. Read the note, then read
-the files the note points at. Don't grep the repo blind.
+Read the note first, then the files the note points at. Don't grep the repo blind.
+
+- [ ] Read `joi_web/docs/obsidian/Home.md`
+- [ ] Read `payments/Verifone 3DS.md`, and the routes it names
+- [ ] Read `payments/Dropp Delivery.md`, and `src/lib/dropp.ts`
+- [ ] Read `commerce/Cart & Checkout.md` — the shared order-creation path both use
 
 | Problem here | Where joi_web answers it |
 |---|---|
@@ -54,7 +63,7 @@ quirks — snake_case field names, names truncated to 22 characters — that are
 down in the note precisely because they cost days to find. Read those before you
 write any Verifone code.
 
-→ **Before fixing anything in section 1, read both notes and write down which of
+- [ ] **Before fixing anything in section 1, read both notes and write down which of
 these five you're porting and which you're solving differently, and why.**
 
 ---
@@ -73,7 +82,7 @@ So the default path is: deploy, point it at production, and every cart, address 
 order this app creates goes into the live shop — including everything you break
 while testing.
 
-→ **Is there a staging Magento? If not, how do you test sections 1 to 4 without
+- [ ] **Is there a staging Magento? If not, how do you test sections 1 to 4 without
 filling the live shop with junk carts and test orders?**
 
 Do not go past this line until you can answer that.
@@ -92,7 +101,7 @@ calls it.
 Verifone and Dropp are both coming, and joi_web already runs both — see the
 reference section below. That makes this unfinished work, not a deployment step.
 
-→ **Until Verifone is wired in, is this a test site that deliberately can't charge
+- [ ] **Until Verifone is wired in, is this a test site that deliberately can't charge
 anyone? Who makes sure no customer-facing domain points at it before then?**
 
 ### 0.3 · What does `PLACE_REAL_ORDERS` do?
@@ -101,7 +110,7 @@ anyone? Who makes sure no customer-facing domain points at it before then?**
 pretends the order was placed and never touches Magento. Everything in Section 1
 below is harmless while it's off, and all of it goes live the moment it's on.
 
-→ **Who is allowed to set it, and what has to be working before they do?**
+- [ ] **Who is allowed to set it, and what has to be working before they do?**
 
 ---
 
@@ -128,7 +137,7 @@ Try it yourself before you accept this. You'll need a `.env.local` with a workin
 `MAGENTO_GRAPHQL_ENDPOINT` (step 1 creates a real cart, so it can't run without
 one), and leave `PLACE_REAL_ORDERS` unset so it stops at the pretend branch.
 
-→ **Which routes and pages are only meant for development, and what actually stops
+- [ ] **Which routes and pages are only meant for development, and what actually stops
 them being reachable in production? Right now: one route checks, the others don't.**
 
 ### 1.2 · The payment secret has a working fallback
@@ -139,7 +148,7 @@ public repo, so anyone can read it and forge a payment message.
 
 A warning in a log file is not protection. Nobody reads logs until something breaks.
 
-→ **When the payment secret is missing, should the app warn and carry on, or refuse
+- [ ] **When the payment secret is missing, should the app warn and carry on, or refuse
 to start? Which of those do you want the forgetful person to get?**
 
 ### 1.3 · `/api/pay` will accept a payment method that means "not paid"
@@ -151,7 +160,7 @@ whichever Magento offers first.
 Every one of those means the money has not been collected. Meanwhile the customer
 went through a sandbox page that charged them nothing.
 
-→ **If no proper payment method is available on the cart, should it fall back to
+- [ ] **If no proper payment method is available on the cart, should it fall back to
 "cheque in the post", or refuse? What would the shop's accountant say to a real
 order marked `free`?**
 
@@ -172,7 +181,7 @@ order code again.
 Result: the customer is charged, no order is ever created, and the retry mechanism
 the code is counting on has been switched off by the line above it.
 
-→ **At what point is an event genuinely "done"? Write that as one sentence before
+- [ ] **At what point is an event genuinely "done"? Write that as one sentence before
 you change any code.**
 
 ### 1.5 · Every Magento call is retried, including placing the order
@@ -188,7 +197,7 @@ seconds) looks exactly like a failure. So it gets sent again.
 it would ship twice. The retry is happening one layer below, where that comment
 can't see it.
 
-→ **Which of these calls are safe to repeat blindly? Should "retry" be a property of
+- [ ] **Which of these calls are safe to repeat blindly? Should "retry" be a property of
 the connection, or of each individual call?**
 
 ---
@@ -206,7 +215,7 @@ The list is only built from the two parent SKUs (`stockCheck.ts:22-25`). And
 So your last check before taking money can silently do nothing at all, and it won't
 log a thing when it does.
 
-→ **When a safety check can't work out the answer, should it pass or fail? Which
+- [ ] **When a safety check can't work out the answer, should it pass or fail? Which
 does this one do right now?**
 
 ### 2.2 · Picking "heimsending" may not change the delivery at all
@@ -222,7 +231,7 @@ The only record of the choice is a line of free text stuck on the address
 joi_web does this properly — the pickup ID goes onto the cart itself
 (`setDroppOnCartIfApplicable()`), and Dropp gets a real booking through their API.
 
-→ **How does the person packing the parcel tell the two apart? Follow it from the
+- [ ] **How does the person packing the parcel tell the two apart? Follow it from the
 button click to something a warehouse can actually read. Then compare with how
 joi_web does it.**
 
@@ -234,7 +243,7 @@ deliberate choice — don't lose sales over someone else's outage — but it mea
 orders get accepted for postcodes Dropp doesn't deliver to, and nothing anywhere
 records that the check was skipped.
 
-→ **Who finds out that it happened, and how?**
+- [ ] **Who finds out that it happened, and how?**
 
 ### 2.4 · The town on the order is wrong for a lot of the country
 
@@ -245,7 +254,7 @@ ranges are far too wide. `[500,531,"Hvammstangi"]` labels Hólmavík, Drangsnes 
 
 This is always used, because the checkout form has no town field at all.
 
-→ **The app already downloads the official national address registry to validate
+- [ ] **The app already downloads the official national address registry to validate
 addresses. Why is the town coming from a hand-typed table instead?**
 
 ---
@@ -258,7 +267,7 @@ No `Dockerfile`, no `.do/app.yaml`, no `Procfile`. And the top level of the repo
 **no `package.json`** — the app lives in `storefront/`. DigitalOcean looks at the top
 level to work out what kind of app this is, and will find nothing.
 
-→ **How do you tell App Platform the app is in a subfolder? And which port does
+- [ ] **How do you tell App Platform the app is in a subfolder? And which port does
 `next start` listen on when DigitalOcean sets `PORT`? Check that one — don't assume.**
 
 ### 3.2 · The app is only correct with exactly one copy running, and nothing says so
@@ -278,7 +287,7 @@ That causes three different problems:
 - **Nothing is ever cleaned up:** the list of handled payments and the order results
   only grow. A copy that runs for weeks holds every cart id it has ever seen.
 
-→ **Where should information that must survive a restart actually live? And
+- [ ] **Where should information that must survive a restart actually live? And
 separately — what stops someone dragging the instance-count slider in the
 DigitalOcean dashboard six months from now?**
 
@@ -293,7 +302,7 @@ Every first-time visitor. Every Google crawler. Every uptime checker. And there'
 rate limiting (4.4), so there's no ceiling on it. Magento's quote tables grow on
 every one of them, and it's the live shop taking that (0.1).
 
-→ **At what point in a visit should a cart come into existence?**
+- [ ] **At what point in a visit should a cart come into existence?**
 
 ### 3.4 · The address registry may kill the container
 
@@ -309,7 +318,7 @@ restarts it, and the next customer does it again. Submitting the form triggers i
 too (`checkout/route.ts:50`), so the prefetch isn't the only route in. And line 58
 allows 60 seconds for the download, so it's degraded for up to a minute first.
 
-→ **Measure this, don't guess: deploy, open `/afgreidsla` once, and write down the
+- [ ] **Measure this, don't guess: deploy, open `/afgreidsla` once, and write down the
 peak memory from the DigitalOcean graph. Then ask whether a shop needs the entire
 national address registry sitting in its own memory.**
 
@@ -323,7 +332,7 @@ Nothing crashes. The free-shipping threshold falls back to `15000`, so the site
 confidently shows a number that may be wrong. The Dropp store id has no fallback and
 logs nothing at all — the map picker just misbehaves.
 
-→ **Which of your settings are needed when building, and which when running? Work
+- [ ] **Which of your settings are needed when building, and which when running? Work
 that out before you type anything into the DigitalOcean environment editor.**
 
 ### 3.6 · No Node version is pinned
@@ -331,7 +340,7 @@ that out before you type anything into the DigitalOcean environment editor.**
 No `engines` in `package.json`, no `.nvmrc`. Next.js 16 has a minimum version, and
 the platform default can change between one deploy and the next.
 
-→ **Which Node version did you build and test on, and where is that written down so
+- [ ] **Which Node version did you build and test on, and where is that written down so
 the platform uses the same one?**
 
 ### 3.7 · The health check may be hitting your slowest page
@@ -344,7 +353,7 @@ checks, which means the container gets restarted, over and over — and nothing 
 logs will say "Magento". That's exactly the kind of failure that's impossible to
 diagnose if you haven't seen it before.
 
-→ **Which path does the health check request, and does that path make an outside
+- [ ] **Which path does the health check request, and does that path make an outside
 network call? Find out rather than assume — if yes, it's a settings change, not a
 code change.**
 
@@ -359,7 +368,7 @@ code change.**
 nákvæma checkout-villu á meðan við kembum"* — you added it to debug, and it was never
 taken out. Magento errors routinely contain endpoint URLs and internal field names.
 
-→ **What does a customer need to see when checkout fails, and what do you need to
+- [ ] **What does a customer need to see when checkout fails, and what do you need to
 see? Where should the second one go instead?**
 
 ### 4.2 · The cart id ends up in the address bar
@@ -369,7 +378,7 @@ The cart id is deliberately kept in a cookie JavaScript can't read (`cart.ts:57-
 `/api/order-status?ref=…` (`stadfesting:21`), which has no access check. URLs end up
 in browser history, in referrer headers and in server logs.
 
-→ **What was that cookie protecting against, and is it still protected once the same
+- [ ] **What was that cookie protecting against, and is it still protected once the same
 value is in the address bar? Answer this together with 1.1.**
 
 ### 4.3 · The error dashboard is broken by its own security check
@@ -379,7 +388,7 @@ never sends one. So in production the dashboard is permanently empty — and an 
 dashboard looks exactly like "no errors". Meanwhile anyone can write into it, because
 the POST side has no check at all.
 
-→ **Is a list held in one process's memory the right place for production errors?
+- [ ] **Is a list held in one process's memory the right place for production errors?
 (See 3.2 — it's wiped on every deploy.)**
 
 ### 4.4 · Nothing is rate limited
@@ -388,7 +397,7 @@ the POST side has no check at all.
 expensive endpoints anyone can call are `/api/checkout` (six or more Magento
 operations per call), `/api/address-check` and `/api/cart`.
 
-→ **What's the cheapest request a stranger can send that costs your Magento the most
+- [ ] **What's the cheapest request a stranger can send that costs your Magento the most
 work? Time it.**
 
 ---
@@ -403,7 +412,7 @@ on **every push to main**. I checked:
 still serving the old static site, which still contains
 `AVAILABILITY_URL = "PASTE-AVAILABILITY-URL"` (`site/index.html:208`).
 
-→ **Is that URL supposed to be public? Turning the workflow off doesn't remove what's
+- [ ] **Is that URL supposed to be public? Turning the workflow off doesn't remove what's
 already published.**
 
 ### 5.2 · The documentation describes a system that no longer exists
@@ -422,7 +431,7 @@ untouched `create-next-app` boilerplate, telling you to deploy on Vercel.
 Hand this repo to someone and those documents will send them off building Azure
 infrastructure for a week.
 
-→ **Which of `middleware/`, `site/` and those three documents are still real, and
+- [ ] **Which of `middleware/`, `site/` and those three documents are still real, and
 which are history? Anything in the second group needs to say so on its first line.**
 
 ### 5.3 · There's no list of settings anywhere

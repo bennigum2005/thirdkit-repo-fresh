@@ -7,7 +7,24 @@ import Link from "next/link";
 type CartItem = { uid: string; name: string; sizeLabel: string; quantity: number; rowTotal: number };
 type Cart = { items: CartItem[]; grandTotal: number };
 type Method = { carrier: string; method: string; title: string; amount: number };
-type DroppLocation = { id: string; name: string; address?: string };
+type DroppLocation = { id: string; name: string; address?: string; lat?: number; lng?: number };
+
+/** Great-circle distance in km (haversine) — fine at Iceland scale. */
+function distKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+function distLabel(km: number): string {
+  return km < 1
+    ? `${Math.round(km * 1000)} m`
+    : `${km.toFixed(1).replace(".", ",")} km`;
+}
 
 /** Accent-insensitive contains-match so „Skeifan" finnst með „skeifan". */
 function norm(s: string): string {
@@ -138,6 +155,9 @@ export default function CheckoutPage() {
   const [droppList, setDroppList] = useState<DroppLocation[] | null>(null);
   const [droppListFailed, setDroppListFailed] = useState(false);
   const [droppQuery, setDroppQuery] = useState("");
+  // Browser geolocation → distance-sorted pickup list. "denied" falls back to search.
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoStatus, setGeoStatus] = useState<"idle" | "asking" | "ok" | "denied">("idle");
   // null = still checking; true/false = Dropp's deliveryzips answer
   const [homeAvailable, setHomeAvailable] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -204,6 +224,31 @@ export default function CheckoutPage() {
       .then((data) => setDroppList((data.locations ?? []) as DroppLocation[]))
       .catch(() => setDroppListFailed(true)); // fall back to the map widget
   }, [picked, droppList, droppListFailed]);
+
+  // Ask for the shopper's location once the Dropp option is active
+  useEffect(() => {
+    if (picked?.kind !== "dropp" || geoStatus !== "idle") return;
+    if (!("geolocation" in navigator)) { setGeoStatus("denied"); return; }
+    setGeoStatus("asking");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoStatus("ok");
+      },
+      () => setGeoStatus("denied"),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 }
+    );
+  }, [picked, geoStatus]);
+
+  // Distance-sorted list (when we know where the shopper is)
+  const droppNearby =
+    userPos && droppList
+      ? droppList
+          .filter((l) => typeof l.lat === "number" && typeof l.lng === "number")
+          .map((l) => ({ ...l, km: distKm(userPos.lat, userPos.lng, l.lat!, l.lng!) }))
+          .sort((a, b) => a.km - b.km)
+          .slice(0, 12)
+      : null;
 
   const droppMatches =
     droppList && droppQuery.trim().length >= 2
@@ -418,6 +463,30 @@ export default function CheckoutPage() {
                     style={{ background: "var(--black-2)", border: "1.5px dashed var(--gold-dim)", color: "var(--gold-bright)" }}>
                     Veldu Dropp-afhendingarstað á korti
                   </button>
+                ) : droppNearby ? (
+                  // Sorted by distance from the shopper's location
+                  <div className="flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ maxHeight: 280 }}>
+                    {droppNearby.map((l) => (
+                      <button key={l.id}
+                        onClick={() => { setDroppLoc(l); setError(null); }}
+                        className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-left cursor-pointer text-[0.9rem]"
+                        style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.18)", color: "var(--text)" }}>
+                        <span className="flex-1">
+                          <span className="font-bold">{l.name}</span>
+                          {l.address && (
+                            <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>{l.address}</span>
+                          )}
+                        </span>
+                        <span className="flex-shrink-0 text-[0.8rem] font-bold" style={{ color: "var(--gold-bright)" }}>
+                          {distLabel(l.km)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : geoStatus === "asking" ? (
+                  <p className="text-[0.85rem] px-1" style={{ color: "var(--muted)" }}>
+                    Sæki staðsetningu til að finna næstu afhendingarstaði…
+                  </p>
                 ) : (
                   <div>
                     <input

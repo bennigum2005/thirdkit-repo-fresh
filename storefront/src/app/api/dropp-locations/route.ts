@@ -8,7 +8,7 @@ const DROPP_LOCATIONS_URL =
   process.env.DROPP_LOCATIONS_URL ??
   "https://api.dropp.is/dropp/api/v1/dropp/locations";
 
-type SlimLocation = { id: string; name: string; address: string };
+type SlimLocation = { id: string; name: string; address: string; lat?: number; lng?: number };
 
 /** Dropp's payload shape has varied — read it defensively. */
 function slim(raw: unknown): SlimLocation[] {
@@ -42,7 +42,12 @@ function slim(raw: unknown): SlimLocation[] {
         .filter(Boolean)
         .join(", ");
     }
-    out.push({ id, name, address });
+    const lat = Number(loc.gpsLatitude ?? loc.latitude ?? loc.lat);
+    const lng = Number(loc.gpsLongitude ?? loc.longitude ?? loc.lng);
+    out.push({
+      id, name, address,
+      ...(isFinite(lat) && isFinite(lng) && lat !== 0 ? { lat, lng } : {}),
+    });
   }
   return out;
 }

@@ -29,6 +29,36 @@ A few words used throughout:
 
 ---
 
+## The reference: joi_web already solves most of this
+
+Third Kit is going to run Verifone and Dropp, the same as `joiweb/joi_web`. That is
+a live Next.js storefront on headless Magento with both already working. Almost
+every problem below has already been answered there — in production, against real
+money.
+
+Start at `joi_web/docs/obsidian/Home.md`. The two notes that matter here are
+`payments/Verifone 3DS.md` and `payments/Dropp Delivery.md`. Read the note, then read
+the files the note points at. Don't grep the repo blind.
+
+| Problem here | Where joi_web answers it |
+|---|---|
+| 0.2 no payment provider | Three-leg flow: `api/verifone/payment/` → hosted page → `api/verifone/webhook/` |
+| 1.2 shared static secret | Webhook verifies a JWS signature against `VERIFONE_JWKS_URL`. No shared secret to leak. |
+| 1.4 order lost on retry | Dedupe key, a short-lived lock, and a completion key checked *before* creating the order — see "Idempotency & race conditions" in the Verifone note |
+| 2.2 Dropp pickup vs home | `setDroppOnCartIfApplicable()` in `src/lib/checkoutFinalize.ts:839` writes the pickup ID onto the cart. Not a free-text address line. |
+| 3.2 state in one process | All of it lives in Valkey (a shared key-value store), not process memory — which is why extra copies of the app are safe there and not here |
+
+Two things to keep in mind while reading it. joi_web is Next.js 15 and this is
+Next 16, so some conventions differ. And its Verifone integration has hard-won
+quirks — snake_case field names, names truncated to 22 characters — that are written
+down in the note precisely because they cost days to find. Read those before you
+write any Verifone code.
+
+→ **Before fixing anything in section 1, read both notes and write down which of
+these five you're porting and which you're solving differently, and why.**
+
+---
+
 ## 0 — Stop here first
 
 Three questions. Nothing below matters until they're answered.
@@ -48,7 +78,7 @@ filling the live shop with junk carts and test orders?**
 
 Do not go past this line until you can answer that.
 
-### 0.2 · This app cannot take money
+### 0.2 · This app cannot take money yet
 
 `payment.ts:36-44` — the function that's supposed to start a payment ignores the
 amount entirely and sends the customer to `/sandbox-greidsla`, which is a fake
@@ -59,8 +89,11 @@ The Verifone code you wrote is in `middleware/src/verifone.js`. That's the old A
 Functions project. It does not deploy to DigitalOcean and nothing in the storefront
 calls it.
 
-→ **Is this a test site that deliberately can't charge anyone? Or is the payment
-provider actual unfinished work, rather than a deployment step?**
+Verifone and Dropp are both coming, and joi_web already runs both — see the
+reference section below. That makes this unfinished work, not a deployment step.
+
+→ **Until Verifone is wired in, is this a test site that deliberately can't charge
+anyone? Who makes sure no customer-facing domain points at it before then?**
 
 ### 0.3 · What does `PLACE_REAL_ORDERS` do?
 
@@ -186,8 +219,12 @@ customer picks home delivery and the order comes out identical to a pickup order
 The only record of the choice is a line of free text stuck on the address
 (`checkout/route.ts:74-77`, `checkoutFinalize.ts:126-128`).
 
+joi_web does this properly — the pickup ID goes onto the cart itself
+(`setDroppOnCartIfApplicable()`), and Dropp gets a real booking through their API.
+
 → **How does the person packing the parcel tell the two apart? Follow it from the
-button click to something a warehouse can actually read.**
+button click to something a warehouse can actually read. Then compare with how
+joi_web does it.**
 
 ### 2.3 · Home delivery is allowed when Dropp can't be reached
 

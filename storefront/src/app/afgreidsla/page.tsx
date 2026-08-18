@@ -158,6 +158,7 @@ export default function CheckoutPage() {
   // Browser geolocation → distance-sorted pickup list. "denied" falls back to search.
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoStatus, setGeoStatus] = useState<"idle" | "asking" | "ok" | "denied">("idle");
+  const [droppOpen, setDroppOpen] = useState(false);
   // null = still checking; true/false = Dropp's deliveryzips answer
   const [homeAvailable, setHomeAvailable] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -240,22 +241,28 @@ export default function CheckoutPage() {
     );
   }, [picked, geoStatus]);
 
-  // Distance-sorted list (when we know where the shopper is)
-  const droppNearby =
-    userPos && droppList
-      ? droppList
-          .filter((l) => typeof l.lat === "number" && typeof l.lng === "number")
-          .map((l) => ({ ...l, km: distKm(userPos.lat, userPos.lng, l.lat!, l.lng!) }))
-          .sort((a, b) => a.km - b.km)
-          .slice(0, 12)
-      : null;
-
-  const droppMatches =
-    droppList && droppQuery.trim().length >= 2
-      ? droppList
-          .filter((l) => norm(`${l.name} ${l.address ?? ""}`).includes(norm(droppQuery.trim())))
-          .slice(0, 6)
-      : [];
+  // One list for the dropdown: filtered by the search text, sorted by
+  // distance when we know where the shopper is, alphabetically otherwise.
+  const droppDisplay = (() => {
+    if (!droppList) return [];
+    const q = droppQuery.trim();
+    const base = q.length >= 2
+      ? droppList.filter((l) => norm(`${l.name} ${l.address ?? ""}`).includes(norm(q)))
+      : droppList;
+    const withKm = base.map((l) => ({
+      ...l,
+      km:
+        userPos && typeof l.lat === "number" && typeof l.lng === "number"
+          ? distKm(userPos.lat, userPos.lng, l.lat, l.lng)
+          : null,
+    }));
+    withKm.sort((a, b) =>
+      a.km !== null && b.km !== null
+        ? a.km - b.km
+        : a.km !== null ? -1 : b.km !== null ? 1 : a.name.localeCompare(b.name, "is")
+    );
+    return withKm.slice(0, 30);
+  })();
 
   async function pickDroppLocation() {
     setError(null);
@@ -451,7 +458,7 @@ export default function CheckoutPage() {
                       <span className="font-bold">{droppLoc.name}</span>
                       {droppLoc.address && <span style={{ color: "var(--muted)" }}> — {droppLoc.address}</span>}
                     </span>
-                    <button onClick={() => { setDroppLoc(null); setDroppQuery(""); }}
+                    <button onClick={() => { setDroppLoc(null); setDroppQuery(""); setDroppOpen(true); }}
                       className="text-[0.72rem] tracking-[0.16em] uppercase cursor-pointer"
                       style={{ background: "none", border: "none", color: "var(--gold)" }}>
                       Breyta
@@ -463,61 +470,93 @@ export default function CheckoutPage() {
                     style={{ background: "var(--black-2)", border: "1.5px dashed var(--gold-dim)", color: "var(--gold-bright)" }}>
                     Veldu Dropp-afhendingarstað á korti
                   </button>
-                ) : droppNearby ? (
-                  // Sorted by distance from the shopper's location
-                  <div className="flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ maxHeight: 280 }}>
-                    {droppNearby.map((l) => (
-                      <button key={l.id}
-                        onClick={() => { setDroppLoc(l); setError(null); }}
-                        className="flex items-center gap-3 w-full rounded-xl px-4 py-3 text-left cursor-pointer text-[0.9rem]"
-                        style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.18)", color: "var(--text)" }}>
-                        <span className="flex-1">
-                          <span className="font-bold">{l.name}</span>
-                          {l.address && (
-                            <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>{l.address}</span>
-                          )}
-                        </span>
-                        <span className="flex-shrink-0 text-[0.8rem] font-bold" style={{ color: "var(--gold-bright)" }}>
-                          {distLabel(l.km)}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : geoStatus === "asking" ? (
-                  <p className="text-[0.85rem] px-1" style={{ color: "var(--muted)" }}>
-                    Sæki staðsetningu til að finna næstu afhendingarstaði…
-                  </p>
                 ) : (
                   <div>
-                    <input
-                      type="text"
-                      value={droppQuery}
-                      onChange={(e) => setDroppQuery(e.target.value)}
-                      placeholder={droppList === null ? "Sæki afhendingarstaði…" : "Leitaðu að heimilisfangi eða stað…"}
+                    {/* Dropdown trigger with a chevron */}
+                    <button
+                      onClick={() => setDroppOpen((o) => !o)}
                       disabled={droppList === null}
-                      className="w-full rounded-xl px-4 py-3.5 text-[0.95rem] outline-none focus:border-[var(--gold)]"
-                      style={inputStyle}
-                    />
-                    {droppQuery.trim().length >= 2 && (
-                      <div className="mt-2 flex flex-col gap-1.5">
-                        {droppMatches.map((l) => (
-                          <button key={l.id}
-                            onClick={() => { setDroppLoc(l); setError(null); }}
-                            className="w-full rounded-xl px-4 py-3 text-left cursor-pointer text-[0.9rem]"
-                            style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.18)", color: "var(--text)" }}>
-                            <span className="font-bold">{l.name}</span>
-                            {l.address && <span style={{ color: "var(--muted)" }}> — {l.address}</span>}
-                          </button>
-                        ))}
-                        {!droppMatches.length && (
-                          <p className="text-[0.82rem] px-1" style={{ color: "var(--muted)" }}>
-                            Enginn afhendingarstaður fannst — prófaðu götuheiti eða bæjarfélag.
+                      className="flex items-center justify-between w-full rounded-xl px-4 py-3.5 cursor-pointer text-[0.95rem]"
+                      style={{
+                        background: "var(--black-2)",
+                        border: droppOpen ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
+                        color: droppList === null ? "var(--muted)" : "var(--text)",
+                      }}
+                    >
+                      <span>{droppList === null ? "Sæki afhendingarstaði…" : "Veldu Dropp-afhendingarstað"}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ transform: droppOpen ? "rotate(180deg)" : "none", transition: "transform .15s", color: "var(--gold)" }}>
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+
+                    {droppOpen && droppList && (
+                      <div className="mt-2 rounded-xl p-2"
+                        style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.14)" }}>
+                        <input
+                          type="text"
+                          value={droppQuery}
+                          onChange={(e) => setDroppQuery(e.target.value)}
+                          placeholder="Sía eftir nafni eða stað…"
+                          className="w-full rounded-lg px-3 py-2.5 mb-2 text-[0.9rem] outline-none focus:border-[var(--gold)]"
+                          style={inputStyle}
+                        />
+                        {geoStatus === "asking" && (
+                          <p className="text-[0.78rem] px-1 pb-1" style={{ color: "var(--muted)" }}>
+                            Sæki staðsetningu til að raða eftir fjarlægð…
                           </p>
                         )}
+                        <div className="flex flex-col gap-1 overflow-y-auto pr-1" style={{ maxHeight: 260 }}>
+                          {droppDisplay.map((l) => (
+                            <button key={l.id}
+                              onClick={() => { setDroppLoc(l); setDroppOpen(false); setError(null); }}
+                              className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left cursor-pointer text-[0.9rem]"
+                              style={{ background: "transparent", border: "none", color: "var(--text)" }}>
+                              <span className="flex-1">
+                                <span className="font-bold">{l.name}</span>
+                                {l.address && (
+                                  <span className="block text-[0.76rem] mt-0.5" style={{ color: "var(--muted)" }}>{l.address}</span>
+                                )}
+                              </span>
+                              {l.km !== null && (
+                                <span className="flex-shrink-0 text-[0.78rem] font-bold" style={{ color: "var(--gold-bright)" }}>
+                                  {distLabel(l.km)}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                          {!droppDisplay.length && (
+                            <p className="text-[0.82rem] px-1 py-2" style={{ color: "var(--muted)" }}>
+                              Enginn afhendingarstaður fannst — prófaðu annað leitarorð.
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {picked?.kind === "home" && (
+              <div className="mt-5">
+                <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+                  Sent heim á
+                </div>
+                <div className="rounded-xl px-4 py-3.5"
+                  style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)" }}>
+                  <span className="text-[0.9rem] font-bold">{form.address}</span>
+                  <span className="block text-[0.82rem] mt-0.5" style={{ color: "var(--muted)" }}>
+                    {form.postalCode}
+                  </span>
+                </div>
+                <p className="mt-2 text-[0.78rem]" style={{ color: "var(--muted)" }}>
+                  Ekki rétt? <button onClick={() => setStep("form")} className="cursor-pointer underline"
+                    style={{ background: "none", border: "none", color: "var(--gold)", padding: 0 }}>
+                    Breyta heimilisfangi
+                  </button>
+                </p>
               </div>
             )}
 

@@ -32,7 +32,7 @@ app.http("confirm", {
       const qty = Math.min(10, Math.max(1, parseInt(m?.[3] || "1", 10) || 1));
       const cfg = itemMap()?.[product];
       const variantCode = cfg?.variants?.[size];
-      const productPage = `index.html?product=${product === "kids" ? "kids" : "adult"}`;
+      const productPage = product === "kids" ? "barna.html" : "fullordins.html";
 
       if (!cfg?.item || !variantCode || !cid) {
         context.warn(`Confirm with missing data: ref='${ref}' cid='${cid}'`);

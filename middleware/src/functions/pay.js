@@ -22,7 +22,7 @@ app.http("pay", {
       const cfg = map?.[product];
       const variantCode = cfg?.variants?.[size];
       const price = prices?.[product];
-      const productPage = `index.html?product=${product === "kids" ? "kids" : "adult"}`;
+      const productPage = product === "kids" ? "barna.html" : "fullordins.html";
 
       if (!cfg?.item || !variantCode || !price) {
         return { status: 400, body: "Óþekkt vara eða stærð." };
@@ -32,7 +32,7 @@ app.http("pay", {
       try {
         const perVariant = await getVariantInventory(cfg.item);
         if ((perVariant[variantCode] ?? 0) < qty) {
-          return { status: 302, headers: { Location: `${process.env.SITE_BASE_URL}/${productPage}&soldout=1` } };
+          return { status: 302, headers: { Location: `${process.env.SITE_BASE_URL}/${productPage}?soldout=1` } };
         }
       } catch (e) {
         context.warn("Stock pre-check failed, allowing purchase: " + e.message);

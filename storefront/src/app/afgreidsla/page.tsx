@@ -26,6 +26,52 @@ function distLabel(km: number): string {
     : `${km.toFixed(1).replace(".", ",")} km`;
 }
 
+// Fallback anchor when the shopper declines geolocation: approximate centre
+// of the postcode's town, so the list is ALWAYS in distance order.
+const POSTCODE_ANCHORS: Array<[number, number, number, number]> = [
+  [100, 162, 64.135, -21.895], // Reykjavík
+  [170, 172, 64.155, -21.995], // Seltjarnarnes
+  [190, 191, 63.966, -22.375], // Vogar
+  [200, 206, 64.11, -21.9],    // Kópavogur
+  [210, 212, 64.088, -21.923], // Garðabær
+  [220, 225, 64.067, -21.95],  // Hafnarfjörður
+  [230, 262, 63.998, -22.56],  // Reykjanesbær/Suðurnes
+  [270, 277, 64.167, -21.7],   // Mosfellsbær
+  [300, 302, 64.322, -22.07],  // Akranes
+  [310, 321, 64.54, -21.92],   // Borgarnes
+  [340, 356, 65.07, -22.73],   // Stykkishólmur/Snæfellsnes
+  [360, 361, 64.92, -23.25],   // Hellissandur
+  [370, 381, 65.11, -21.77],   // Búðardalur
+  [400, 431, 66.075, -23.13],  // Ísafjörður og nágrenni
+  [450, 471, 65.59, -23.96],   // Patreksfjörður og sunnanverðir Vestfirðir
+  [500, 531, 65.395, -20.94],  // Hvammstangi
+  [540, 546, 65.66, -20.28],   // Blönduós
+  [550, 570, 65.75, -19.64],   // Sauðárkrókur
+  [580, 581, 66.15, -18.91],   // Siglufjörður
+  [600, 616, 65.68, -18.09],   // Akureyri
+  [620, 631, 65.97, -18.53],   // Dalvík/Ólafsfjörður
+  [640, 661, 66.045, -17.34],  // Húsavík
+  [670, 691, 66.3, -16.45],    // Norðausturhorn
+  [700, 701, 65.26, -14.39],   // Egilsstaðir
+  [710, 741, 65.15, -13.9],    // Firðir (Seyðisfj.–Neskaupstaður)
+  [750, 766, 64.93, -14.01],   // Suðurfirðir
+  [780, 786, 64.25, -15.21],   // Höfn
+  [800, 816, 63.93, -21.0],    // Selfoss/Hveragerði/Þorlákshöfn
+  [820, 851, 63.93, -20.6],    // Eyrarbakki–Hella
+  [860, 861, 63.75, -20.23],   // Hvolsvöllur
+  [870, 881, 63.42, -19.01],   // Vík/Klaustur
+  [900, 903, 63.44, -20.27],   // Vestmannaeyjar
+];
+
+function anchorForPostcode(pc: string): { lat: number; lng: number } | null {
+  const n = parseInt(pc, 10);
+  if (isNaN(n)) return null;
+  for (const [from, to, lat, lng] of POSTCODE_ANCHORS) {
+    if (n >= from && n <= to) return { lat, lng };
+  }
+  return null;
+}
+
 /** Accent-insensitive contains-match so „Skeifan" finnst með „skeifan". */
 function norm(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae");
@@ -249,14 +295,22 @@ export default function CheckoutPage() {
     const base = q.length >= 2
       ? droppList.filter((l) => norm(`${l.name} ${l.address ?? ""}`).includes(norm(q)))
       : droppList;
-    // The shopper's own postcode (from the form) comes first, then the rest —
-    // each group sorted by distance when we have a position.
+    // ALWAYS distance-ordered: GPS if granted, otherwise the centre of the
+    // shopper's own postcode. Own-postcode locations still float to the top.
     const myPost = form.postalCode.trim();
+    const pos =
+      userPos ??
+      (() => {
+        const inPost = droppList.find(
+          (l) => (l.address ?? "").includes(myPost) && typeof l.lat === "number" && typeof l.lng === "number"
+        );
+        return inPost ? { lat: inPost.lat!, lng: inPost.lng! } : anchorForPostcode(myPost);
+      })();
     const withKm = base.map((l) => ({
       ...l,
       km:
-        userPos && typeof l.lat === "number" && typeof l.lng === "number"
-          ? distKm(userPos.lat, userPos.lng, l.lat, l.lng)
+        pos && typeof l.lat === "number" && typeof l.lng === "number"
+          ? distKm(pos.lat, pos.lng, l.lat, l.lng)
           : null,
       inMyPost: myPost.length === 3 && (l.address ?? "").includes(myPost) ? 0 : 1,
     }));

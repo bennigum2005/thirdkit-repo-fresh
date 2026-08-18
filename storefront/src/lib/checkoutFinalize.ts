@@ -246,6 +246,51 @@ export async function getTotalsAndPayments(cartId: string): Promise<TotalsAndPay
   };
 }
 
+export type CartBilling = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  phone: string;
+};
+
+/** Billing info already set on the cart (steps 3–5) — Verifone 3DS needs it. */
+export async function getCartBilling(cartId: string): Promise<CartBilling | null> {
+  type Res = {
+    cart: {
+      email: string | null;
+      billing_address: {
+        firstname: string; lastname: string; street: string[];
+        city: string; postcode: string; telephone: string;
+      } | null;
+    };
+  };
+  const res = await magentoClient().request<Res>(
+    /* GraphQL */ `
+      query billing($cartId: String!) {
+        cart(cart_id: $cartId) {
+          email
+          billing_address { firstname lastname street city postcode telephone }
+        }
+      }
+    `,
+    { cartId }
+  );
+  const b = res.cart.billing_address;
+  if (!b || !res.cart.email) return null;
+  return {
+    email: res.cart.email,
+    firstName: b.firstname,
+    lastName: b.lastname,
+    address: b.street[0] ?? "",
+    city: b.city,
+    postalCode: b.postcode,
+    phone: b.telephone,
+  };
+}
+
 /** Step 7: set a payment method on the cart. */
 export async function setPaymentMethod(cartId: string, code: string): Promise<void> {
   await magentoClient().request(

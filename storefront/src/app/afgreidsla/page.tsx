@@ -93,8 +93,8 @@ function buildOptions(methods: Method[]): DeliveryOption[] {
   const cheapest = [...delivery].sort((a, b) => a.amount - b.amount)[0];
   const paid = [...delivery].filter((m) => !/free/i.test(m.carrier)).sort((a, b) => a.amount - b.amount)[0];
 
-  const pickupMethod = free ?? cheapest; // free-over-threshold applies to Dropp points
-  const homeMethod = paid ?? cheapest;   // home delivery keeps its price
+  const pickupMethod = free ?? cheapest; // free-over-threshold applies to Dropp points ONLY
+  const homeMethod = paid;               // heimsending er ALDREI frí (Dropp verðskrá)
 
   const options: DeliveryOption[] = [];
   if (pickupMethod) options.push({ kind: "dropp", label: "Dropp afhendingarstaður", method: pickupMethod });

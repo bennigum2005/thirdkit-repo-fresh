@@ -7,12 +7,14 @@ import crypto from "crypto";
 import { signPayload } from "@/lib/payment";
 
 export async function POST(request: NextRequest) {
-  const { cartId, double } = (await request.json()) as { cartId?: string; double?: boolean };
-  if (!cartId) return Response.json({ error: "MISSING_CART" }, { status: 400 });
+  const body = (await request.json()) as { ref?: string; cartId?: string; double?: boolean };
+  const ref = body.ref ?? body.cartId; // old callers sent the ref as cartId
+  const double = body.double;
+  if (!ref) return Response.json({ error: "MISSING_REF" }, { status: 400 });
 
   const payload = JSON.stringify({
     eventId: crypto.randomUUID(),
-    cartId,
+    ref,
     status: "paid",
   });
   const signature = signPayload(payload);

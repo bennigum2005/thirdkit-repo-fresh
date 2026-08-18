@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-type Status = { status: "pending" | "placed" | "failed" | "unknown"; orderNumber?: string };
+type Status = { status: "pending" | "placed" | "failed" | "payment_failed" | "unknown"; orderNumber?: string };
 
 function ConfirmationInner() {
   const params = useSearchParams();
@@ -21,7 +21,7 @@ function ConfirmationInner() {
         const res = await fetch(`/api/order-status?ref=${encodeURIComponent(ref)}`);
         const data: Status = await res.json();
         setResult(data);
-        if (data.status === "placed" || data.status === "failed") {
+        if (data.status === "placed" || data.status === "failed" || data.status === "payment_failed") {
           // Order done — the old cart is inactive; touching /api/cart lets the
           // server hand out a fresh one so the badge resets (course ch. 5).
           fetch("/api/cart").finally(() =>
@@ -62,6 +62,14 @@ function ConfirmationInner() {
                 Pöntunarnúmer: {result.orderNumber}
               </p>
             )}
+          </>
+        ) : result.status === "payment_failed" ? (
+          <>
+            <h1 className="uppercase font-extrabold tracking-[0.1em] text-2xl">Greiðslan gekk ekki í gegn</h1>
+            <p className="mt-4 text-[0.95rem] leading-relaxed" style={{ color: "var(--muted)" }}>
+              Engin pöntun varð til og ekkert var tekið af kortinu. Karfan þín bíður
+              óbreytt — <Link href="/afgreidsla" style={{ color: "var(--gold)" }}>reyndu aftur</Link> þegar þú ert til.
+            </p>
           </>
         ) : result.status === "failed" ? (
           <>

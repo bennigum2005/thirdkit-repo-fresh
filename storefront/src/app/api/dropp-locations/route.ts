@@ -61,7 +61,14 @@ export async function GET() {
       const timer = setTimeout(() => controller.abort(), 8000);
       try {
         const res = await fetch(DROPP_LOCATIONS_URL, {
-          headers: { Accept: "application/json" },
+          headers: {
+            Accept: "application/json",
+            // Bearer is fine for READING locations (never for booking — that's
+            // Basic storeId:password, and it happens in fulfilment, not here).
+            ...(process.env.DROPP_API_TOKEN
+              ? { Authorization: `Bearer ${process.env.DROPP_API_TOKEN}` }
+              : {}),
+          },
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(`dropp locations HTTP ${res.status}`);
@@ -69,7 +76,7 @@ export async function GET() {
       } finally {
         clearTimeout(timer);
       }
-      if (locations.length) cacheSet(CACHE, locations, 10 * 60);
+      if (locations.length) cacheSet(CACHE, locations, 3600); // locations change ~monthly
     }
 
     if (!locations.length) {

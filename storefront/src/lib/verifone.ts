@@ -92,7 +92,12 @@ export async function createVerifoneCheckout(input: {
       ...applePayConfiguration(process.env.VERIFONE_APPLE_PAY_PPC_ID),
     },
     return_url: `${input.returnUrlBase}?ref=${encodeURIComponent(input.ref)}&cartId=${encodeURIComponent(input.cartId)}`,
-    notification_url: process.env.CALLBACK_URL,
+    // notification_url rejected with error 127 on this contract — webhooks are
+    // registered centrally in Verifone Central instead. Flag restores it for
+    // contracts that DO accept it per-checkout.
+    ...(process.env.VERIFONE_SEND_NOTIFICATION_URL === "true" && process.env.CALLBACK_URL
+      ? { notification_url: process.env.CALLBACK_URL }
+      : {}),
   };
 
   if (input.billing) {

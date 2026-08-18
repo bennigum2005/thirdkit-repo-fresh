@@ -249,18 +249,24 @@ export default function CheckoutPage() {
     const base = q.length >= 2
       ? droppList.filter((l) => norm(`${l.name} ${l.address ?? ""}`).includes(norm(q)))
       : droppList;
+    // The shopper's own postcode (from the form) comes first, then the rest —
+    // each group sorted by distance when we have a position.
+    const myPost = form.postalCode.trim();
     const withKm = base.map((l) => ({
       ...l,
       km:
         userPos && typeof l.lat === "number" && typeof l.lng === "number"
           ? distKm(userPos.lat, userPos.lng, l.lat, l.lng)
           : null,
+      inMyPost: myPost.length === 3 && (l.address ?? "").includes(myPost) ? 0 : 1,
     }));
-    withKm.sort((a, b) =>
-      a.km !== null && b.km !== null
-        ? a.km - b.km
-        : a.km !== null ? -1 : b.km !== null ? 1 : a.name.localeCompare(b.name, "is")
-    );
+    withKm.sort((a, b) => {
+      if (a.inMyPost !== b.inMyPost) return a.inMyPost - b.inMyPost;
+      if (a.km !== null && b.km !== null) return a.km - b.km;
+      if (a.km !== null) return -1;
+      if (b.km !== null) return 1;
+      return a.name.localeCompare(b.name, "is");
+    });
     return withKm.slice(0, 30);
   })();
 

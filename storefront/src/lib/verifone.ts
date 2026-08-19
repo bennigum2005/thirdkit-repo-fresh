@@ -137,6 +137,9 @@ export async function createVerifoneCheckout(input: {
   if (!res.ok) {
     // 126 → 3DS without full billing · 127 → unknown field · 107 → malformed string
     console.error("verifone checkout failed:", res.status, JSON.stringify(data).slice(0, 800));
+    console.error("verifone payload debug: return_url =", JSON.stringify(payload.return_url),
+      "| ref =", JSON.stringify(payload.merchant_reference),
+      "| base =", JSON.stringify(baseUrl()));
     throw new Error(`VERIFONE_CHECKOUT_${res.status}`);
   }
 

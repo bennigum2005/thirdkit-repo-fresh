@@ -97,8 +97,14 @@ export async function POST(request: NextRequest) {
 
     if (isVerifoneConfigured()) {
       const billing = await getCartBilling(cartId).catch(() => null);
-      const returnUrlBase =
-        process.env.RETURN_URL ?? new URL("/stadfesting", request.nextUrl.origin).toString();
+      // Verifone error 107 guard: the return_url MUST be a valid https uri.
+      // Repair the common typo (https// without the colon) and force https —
+      // behind DO's proxy the origin can look like http://.
+      const rawReturn =
+        process.env.RETURN_URL?.trim() || new URL("/stadfesting", request.nextUrl.origin).toString();
+      const returnUrlBase = rawReturn
+        .replace(/^https?\/\//, "https://") // "https//..." → "https://..."
+        .replace(/^http:\/\//, "https://");
       const session = await createVerifoneCheckout({
         ref,
         amount: totals.grandTotal, // ISK major units — do NOT ×100

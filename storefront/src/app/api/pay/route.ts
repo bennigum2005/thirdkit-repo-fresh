@@ -100,8 +100,11 @@ export async function POST(request: NextRequest) {
       // Verifone error 107 guard: the return_url MUST be a valid https uri.
       // Repair the common typo (https// without the colon) and force https —
       // behind DO's proxy the origin can look like http://.
+      // Take only the FIRST whitespace-free token — a paste accident once put
+      // a newline + a second env line inside the value (seen in prod logs).
       const rawReturn =
-        process.env.RETURN_URL?.trim() || new URL("/stadfesting", request.nextUrl.origin).toString();
+        process.env.RETURN_URL?.trim().split(/\s+/)[0] ||
+        new URL("/stadfesting", request.nextUrl.origin).toString();
       const returnUrlBase = rawReturn
         .replace(/^https?\/\//, "https://") // "https//..." → "https://..."
         .replace(/^http:\/\//, "https://");

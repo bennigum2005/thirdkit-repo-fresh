@@ -13,7 +13,9 @@ export default function ErrorDashboard() {
     async function load() {
       if (stopped) return;
       try {
-        const res = await fetch("/api/log-error");
+        // Forward the ?token= from the page URL — the API requires it in prod
+        const token = new URLSearchParams(window.location.search).get("token");
+        const res = await fetch(`/api/log-error${token ? `?token=${encodeURIComponent(token)}` : ""}`);
         if (res.ok) setErrors((await res.json()).errors);
       } catch {}
       setTimeout(load, 5000);

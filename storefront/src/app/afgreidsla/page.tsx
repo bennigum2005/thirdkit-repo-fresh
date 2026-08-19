@@ -84,22 +84,34 @@ const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
 // The visible delivery experience is Dropp (like joiutherji.is); the Magento
 // method underneath carries the price. Raw methods map to two options:
 // Dropp pickup point (widget required) and Dropp home delivery.
-type DeliveryOption = { kind: "dropp" | "home" | "store"; label: string; method: Method };
+type DeliveryOption = { kind: "dropp" | "home" | "store"; label: string; method: Method; displayAmount: number };
+type DroppPrices = { pickup: number; home: number };
 
-function buildOptions(methods: Method[]): DeliveryOption[] {
+// Prices come from the SERVER (official Dropp verðskrá via /api/checkout) —
+// the Magento method underneath only carries the choice.
+function buildOptions(methods: Method[], prices: DroppPrices | null): DeliveryOption[] {
   const isStore = (m: Method) => /instore|pickup|verslun/i.test(`${m.carrier} ${m.method} ${m.title}`);
   const delivery = methods.filter((m) => !isStore(m));
   const free = delivery.find((m) => /free/i.test(m.carrier));
   const cheapest = [...delivery].sort((a, b) => a.amount - b.amount)[0];
   const paid = [...delivery].filter((m) => !/free/i.test(m.carrier)).sort((a, b) => a.amount - b.amount)[0];
 
-  const pickupMethod = free ?? cheapest; // free-over-threshold applies to Dropp points ONLY
-  const homeMethod = paid;               // heimsending er ALDREI frí (Dropp verðskrá)
+  const pickupMethod = free ?? cheapest;
+  const homeMethod = paid ?? cheapest; // verðið kemur úr töflunni — aldrei 0 fyrir heimsendingu
 
   const options: DeliveryOption[] = [];
-  if (pickupMethod) options.push({ kind: "dropp", label: "Dropp afhendingarstaður", method: pickupMethod });
-  if (homeMethod) options.push({ kind: "home", label: "Dropp heimsending", method: homeMethod });
-  if (!options.length) return methods.map((m) => ({ kind: "store" as const, label: m.title, method: m }));
+  if (pickupMethod)
+    options.push({
+      kind: "dropp", label: "Dropp afhendingarstaður", method: pickupMethod,
+      displayAmount: prices ? prices.pickup : pickupMethod.amount,
+    });
+  if (homeMethod)
+    options.push({
+      kind: "home", label: "Dropp heimsending", method: homeMethod,
+      displayAmount: prices ? prices.home : homeMethod.amount,
+    });
+  if (!options.length)
+    return methods.map((m) => ({ kind: "store" as const, label: m.title, method: m, displayAmount: m.amount }));
   return options;
 }
 
@@ -237,7 +249,7 @@ export default function CheckoutPage() {
     setError(null);
     try {
       const data = await post(form);
-      const opts = buildOptions(data.methods as Method[]);
+      const opts = buildOptions(data.methods as Method[], (data.droppPrices as DroppPrices) ?? null);
       setOptions(opts);
       setPicked(opts[0] ?? null); // Dropp preselected
       setStep("methods");
@@ -488,7 +500,7 @@ export default function CheckoutPage() {
                       <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>
                         {disabled
                           ? `Ekki í boði fyrir póstnúmer ${form.postalCode.trim()}`
-                          : o.method.amount === 0 ? "Frítt" : kr(o.method.amount)}
+                          : o.displayAmount === 0 ? "Frítt" : kr(o.displayAmount)}
                       </span>
                     </span>
                     {o.kind !== "store" && (

@@ -246,6 +246,30 @@ export async function getTotalsAndPayments(cartId: string): Promise<TotalsAndPay
   };
 }
 
+/** Jói útherji's custom Magento module: stores the Dropp pickup id + the
+ *  shipping PRICE on the cart, so the custom carrier charges the right amount
+ *  and fulfilment sees the location — same mechanism joiutherji.is uses. */
+export async function setDroppOnCart(
+  cartId: string,
+  pickupId: string,
+  price: number,
+  droppAddress: string
+): Promise<void> {
+  await magentoClient().request(
+    /* GraphQL */ `
+      mutation setDropp($cartId: String!, $pickupId: String!, $price: Float!, $addr: String!) {
+        setDroppOnCart(input: {
+          cart_id: $cartId
+          pickup_id: $pickupId
+          price: $price
+          dropp_address: $addr
+        }) { cart { id } }
+      }
+    `,
+    { cartId, pickupId, price, addr: droppAddress.slice(0, 200) }
+  );
+}
+
 export type CartBilling = {
   email: string;
   firstName: string;

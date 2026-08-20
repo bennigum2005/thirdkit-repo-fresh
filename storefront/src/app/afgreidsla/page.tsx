@@ -477,17 +477,33 @@ export default function CheckoutPage() {
                 <span className="w-[9px] h-[9px] rounded-full" style={{ background: "var(--gold)" }} />
               </span>
               <span className="flex-1 font-bold text-[0.95rem]">Verifone Checkout</span>
-              <span className="flex gap-1.5">
-                {["VISA", "MC", "AMEX"].map((c) => (
-                  <span key={c} className="text-[0.6rem] font-extrabold px-1.5 py-0.5 rounded"
-                    style={{ background: "var(--black-2)", border: "1px solid rgba(255,255,255,.2)", color: "var(--muted)" }}>
-                    {c}
-                  </span>
-                ))}
+              <span className="flex gap-1.5 items-center">
+                {/* VISA */}
+                <span className="px-1.5 py-0.5 rounded font-extrabold italic text-[0.62rem] tracking-tight"
+                  style={{ background: "#1a1f71", color: "#fff" }}>VISA</span>
+                {/* Mastercard */}
+                <span className="px-1.5 py-1 rounded flex items-center"
+                  style={{ background: "#fff" }}>
+                  <span className="w-3 h-3 rounded-full" style={{ background: "#eb001b" }} />
+                  <span className="w-3 h-3 rounded-full -ml-1.5" style={{ background: "#f79e1b", opacity: 0.9 }} />
+                </span>
+                {/* AMEX */}
+                <span className="px-1.5 py-0.5 rounded font-extrabold text-[0.62rem]"
+                  style={{ background: "#2e77bc", color: "#fff" }}>AMEX</span>
               </span>
             </div>
-            <div className="mx-4 mb-4 rounded-lg px-4 py-5 text-center text-[0.85rem] leading-relaxed"
+            <div className="mx-4 mb-4 rounded-lg px-4 py-6 text-center text-[0.85rem] leading-relaxed"
               style={{ background: "var(--black-2)", color: "var(--muted)" }}>
+              <svg width="72" height="52" viewBox="0 0 72 52" fill="none" className="mx-auto mb-3"
+                stroke="var(--gold)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="52" height="40" rx="4" />
+                <path d="M2 12h52" />
+                <circle cx="8" cy="7" r="1" fill="var(--gold)" stroke="none" />
+                <circle cx="14" cy="7" r="1" fill="var(--gold)" stroke="none" />
+                <circle cx="20" cy="7" r="1" fill="var(--gold)" stroke="none" />
+                <path d="M44 27h24" stroke="var(--gold-bright)" />
+                <path d="m61 20 7 7-7 7" stroke="var(--gold-bright)" />
+              </svg>
               Þegar þú smellir á „Klára pöntun" ertu send/ur á örugga greiðslusíðu
               Verifone þar sem þú lýkur kaupunum.
             </div>

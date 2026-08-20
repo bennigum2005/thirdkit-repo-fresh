@@ -15,9 +15,9 @@ const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 // scale crops into images that carry their own dark padding.
 const GALLERY = [
   { src: "/box.png", scale: 1.32 },
-  { src: "/gallery/lokad.png", scale: 1.0 },
-  { src: "/gallery/opid.png", scale: 1.0 },
-  { src: "/gallery/hopur.png", scale: 1.0 },
+  { src: "/gallery/lokad.png?v=2", scale: 1.0 },
+  { src: "/gallery/opid.png?v=2", scale: 1.0 },
+  { src: "/gallery/hopur.png?v=2", scale: 1.0 },
 ];
 
 export function ProductView({ adult, kids, live }: Props) {

@@ -78,8 +78,8 @@ export function ProductView({ adult, kids, live }: Props) {
       </div>
 
       <div className="text-center md:text-left">
-        <h1 className="uppercase font-extrabold tracking-[0.08em] text-3xl md:text-5xl xl:text-7xl">Third Kit</h1>
-        <div className="font-extrabold text-2xl md:text-3xl xl:text-5xl mt-2" style={{ color: "var(--gold-bright)" }}>
+        <h1 className="uppercase font-extrabold tracking-[0.08em] text-3xl md:text-4xl xl:text-5xl">Third Kit</h1>
+        <div className="font-extrabold text-2xl md:text-3xl xl:text-4xl mt-2" style={{ color: "var(--gold-bright)" }}>
           {kr(selected?.price ?? product.price)}
         </div>
 

@@ -11,17 +11,24 @@ type Cat = "adult" | "kids";
 
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 
-// The mystery box product shot — same image for both versions (public/box.png)
+// The mystery box product shot — same image for both versions (public/box.png).
+// The photo has a lot of dark padding baked in, so we crop INTO it (scale
+// inside an overflow-hidden frame) to let the box fill the space.
 function Jersey({ cat }: { cat: Cat }) {
   void cat;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/box.png"
-      alt="Third Kit Mystery Box"
-      className="w-[clamp(200px,36vh,360px)] h-auto rounded-2xl"
-      style={{ filter: "drop-shadow(0 16px 36px rgba(0,0,0,.55))" }}
-    />
+    <div
+      className="w-[clamp(260px,48vh,520px)] rounded-2xl overflow-hidden"
+      style={{ aspectRatio: "1.14", filter: "drop-shadow(0 16px 36px rgba(0,0,0,.55))" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/box.png"
+        alt="Third Kit Mystery Box"
+        className="w-full h-full object-cover"
+        style={{ transform: "scale(1.55)", transformOrigin: "center 47%" }}
+      />
+    </div>
   );
 }
 

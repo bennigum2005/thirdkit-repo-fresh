@@ -12,18 +12,16 @@ type Cat = "adult" | "kids";
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 
 // The mystery box product shot — same image for both versions (public/box.png).
-// No frame, no crop: the photo's own dark backdrop fades out at the edges so
-// it merges seamlessly with the page background — the box floats on the page.
+// joiutherji.is proportions: the image FILLS its half, edge to edge.
 function Jersey({ cat }: { cat: Cat }) {
   void cat;
-  const mask = "radial-gradient(ellipse 72% 72% at center, black 58%, transparent 98%)";
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/box.png"
       alt="Third Kit Mystery Box"
-      className="w-[clamp(230px,68vw,340px)] md:w-[clamp(340px,56vh,700px)] h-auto"
-      style={{ maskImage: mask, WebkitMaskImage: mask }}
+      className="w-full h-full object-cover"
+      style={{ transform: "scale(1.32)", transformOrigin: "center 47%" }}
     />
   );
 }
@@ -64,22 +62,24 @@ export function ProductView({ adult, kids, live }: Props) {
   }
 
   return (
-    <div className="grid md:grid-cols-2 gap-6 md:gap-16 xl:gap-24 items-center w-full max-w-[1020px] xl:max-w-[1500px]">
+    <div className="grid md:grid-cols-2 gap-6 md:gap-14 xl:gap-20 items-center w-full max-w-[1100px] xl:max-w-[1560px]">
       <div
-        className="relative flex items-center justify-center rounded-lg border p-4 md:p-10 xl:p-14 overflow-hidden"
+        className="relative rounded-lg border overflow-hidden aspect-square w-full max-h-[400px] md:max-h-none"
         style={{
           background: "linear-gradient(180deg, var(--black-3), var(--black-2))",
           borderColor: "rgba(212,175,55,.22)",
         }}
       >
-        <div className="absolute top-0 left-0 right-0 h-[3px]"
+        <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
           style={{ background: "linear-gradient(90deg, transparent, var(--gold), transparent)" }} />
         <Jersey cat={cat} />
       </div>
 
       <div className="text-center md:text-left">
-        <h1 className="uppercase font-extrabold tracking-[0.08em] text-3xl md:text-4xl xl:text-5xl">Third Kit</h1>
-        <div className="font-extrabold text-2xl md:text-3xl xl:text-4xl mt-2" style={{ color: "var(--gold-bright)" }}>
+        <h1 className="uppercase font-extrabold tracking-[0.04em] leading-[1.05] text-4xl md:text-5xl xl:text-6xl">
+          Third Kit<span className="block text-[0.55em]" style={{ color: "var(--muted)" }}>Mystery Box</span>
+        </h1>
+        <div className="font-bold text-xl md:text-2xl xl:text-3xl mt-3" style={{ color: "var(--gold-bright)" }}>
           {kr(selected?.price ?? product.price)}
         </div>
 
@@ -133,7 +133,11 @@ export function ProductView({ adult, kids, live }: Props) {
         </div>
 
         <button className="btn-gold w-full mt-5" onClick={addToCart} disabled={busy}>
-          {busy ? "Augnablik…" : added ? "Komið í körfuna ✓" : "Setja í körfu"}
+          {busy
+            ? "Augnablik…"
+            : added
+              ? "Komið í körfuna ✓"
+              : `Setja í körfu • ${kr((selected?.price ?? product.price) * qty)}`}
         </button>
         <p className="mt-3 text-[0.7rem] tracking-[0.08em]" style={{ color: "var(--muted)" }}>
           Þú verður send/ur áfram á örugga greiðslusíðu

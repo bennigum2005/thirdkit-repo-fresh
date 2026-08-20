@@ -58,6 +58,19 @@ body {
   border-color: rgba(255, 255, 255, 0.1);
   color: var(--muted);
 }
+/* Stór skjár: allt vex með — pillur, takkar */
+@media (min-width: 1280px) {
+  .pill {
+    min-width: 92px;
+    padding: 20px 28px;
+    font-size: 1.1rem;
+    border-radius: 16px;
+  }
+  .btn-gold {
+    padding: 20px 46px;
+    font-size: 1rem;
+  }
+}
 
 .btn-gold {
   display: inline-block;

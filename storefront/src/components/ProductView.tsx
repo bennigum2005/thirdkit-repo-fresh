@@ -22,7 +22,7 @@ function Jersey({ cat }: { cat: Cat }) {
     <img
       src="/box.png"
       alt="Third Kit Mystery Box"
-      className="w-[clamp(280px,52vh,560px)] h-auto"
+      className="w-[clamp(230px,68vw,340px)] md:w-[clamp(340px,56vh,700px)] h-auto"
       style={{ maskImage: mask, WebkitMaskImage: mask }}
     />
   );
@@ -64,9 +64,9 @@ export function ProductView({ adult, kids, live }: Props) {
   }
 
   return (
-    <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center w-full max-w-[1020px]">
+    <div className="grid md:grid-cols-2 gap-6 md:gap-16 xl:gap-24 items-center w-full max-w-[1020px] xl:max-w-[1500px]">
       <div
-        className="relative flex items-center justify-center rounded-lg border p-8 md:p-12 overflow-hidden"
+        className="relative flex items-center justify-center rounded-lg border p-4 md:p-10 xl:p-14 overflow-hidden"
         style={{
           background: "linear-gradient(180deg, var(--black-3), var(--black-2))",
           borderColor: "rgba(212,175,55,.22)",
@@ -78,12 +78,12 @@ export function ProductView({ adult, kids, live }: Props) {
       </div>
 
       <div className="text-center md:text-left">
-        <h1 className="uppercase font-extrabold tracking-[0.08em] text-3xl md:text-4xl">Third Kit</h1>
-        <div className="font-extrabold text-2xl mt-2" style={{ color: "var(--gold-bright)" }}>
+        <h1 className="uppercase font-extrabold tracking-[0.08em] text-3xl md:text-5xl xl:text-7xl">Third Kit</h1>
+        <div className="font-extrabold text-2xl md:text-3xl xl:text-5xl mt-2" style={{ color: "var(--gold-bright)" }}>
           {kr(selected?.price ?? product.price)}
         </div>
 
-        <div className="mt-5 mb-2.5 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+        <div className="mt-5 mb-2.5 text-[0.72rem] xl:text-[0.88rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
           Veldu útgáfu
         </div>
         <div className="flex flex-wrap gap-3 justify-center md:justify-start">
@@ -95,7 +95,7 @@ export function ProductView({ adult, kids, live }: Props) {
           ))}
         </div>
 
-        <div className="mt-5 mb-2.5 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+        <div className="mt-5 mb-2.5 text-[0.72rem] xl:text-[0.88rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
           Veldu stærð
         </div>
         <div className="flex flex-wrap gap-3 justify-center md:justify-start">
@@ -117,17 +117,17 @@ export function ProductView({ adult, kids, live }: Props) {
           </p>
         )}
 
-        <div className="mt-5 mb-2.5 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+        <div className="mt-5 mb-2.5 text-[0.72rem] xl:text-[0.88rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
           Magn
         </div>
         <div className="flex items-center gap-4 justify-center md:justify-start">
           <button
-            className="w-10 h-10 rounded-xl text-lg cursor-pointer disabled:opacity-40"
+            className="w-11 h-11 xl:w-14 xl:h-14 rounded-xl text-lg xl:text-2xl cursor-pointer disabled:opacity-40"
             style={{ border: "1px solid var(--gold-dim)", color: "var(--gold-bright)", background: "transparent" }}
             onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1}>−</button>
-          <span className="min-w-6 text-center font-extrabold text-lg">{qty}</span>
+          <span className="min-w-6 text-center font-extrabold text-lg xl:text-2xl">{qty}</span>
           <button
-            className="w-10 h-10 rounded-xl text-lg cursor-pointer disabled:opacity-40"
+            className="w-11 h-11 xl:w-14 xl:h-14 rounded-xl text-lg xl:text-2xl cursor-pointer disabled:opacity-40"
             style={{ border: "1px solid var(--gold-dim)", color: "var(--gold-bright)", background: "transparent" }}
             onClick={() => setQty((q) => Math.min(10, q + 1))} disabled={qty >= 10}>+</button>
         </div>

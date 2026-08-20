@@ -11,20 +11,14 @@ type Cat = "adult" | "kids";
 
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 
-// The mystery box product shot — same image for both versions (public/box.png).
-// joiutherji.is proportions: the image FILLS its half, edge to edge.
-function Jersey({ cat }: { cat: Cat }) {
-  void cat;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/box.png"
-      alt="Third Kit Mystery Box"
-      className="w-full h-full object-cover"
-      style={{ transform: "scale(1.32)", transformOrigin: "center 47%" }}
-    />
-  );
-}
+// Product gallery — all shots share the site's black/gold backdrop.
+// scale crops into images that carry their own dark padding.
+const GALLERY = [
+  { src: "/box.png", scale: 1.32 },
+  { src: "/gallery/lokad.png", scale: 1.0 },
+  { src: "/gallery/opid.png", scale: 1.0 },
+  { src: "/gallery/hopur.png", scale: 1.0 },
+];
 
 export function ProductView({ adult, kids, live }: Props) {
   const [cat, setCat] = useState<Cat>("adult");
@@ -33,6 +27,7 @@ export function ProductView({ adult, kids, live }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  const [imgIdx, setImgIdx] = useState(0);
 
   const product = cat === "adult" ? adult : kids;
   const selected = product.variants.find((v) => v.childSku === childSku) ?? null;
@@ -63,16 +58,41 @@ export function ProductView({ adult, kids, live }: Props) {
 
   return (
     <div className="grid md:grid-cols-2 gap-6 md:gap-14 xl:gap-20 items-center w-full max-w-[1100px] xl:max-w-[1560px]">
-      <div
-        className="relative rounded-lg border overflow-hidden aspect-square w-full max-h-[400px] md:max-h-none"
-        style={{
-          background: "linear-gradient(180deg, var(--black-3), var(--black-2))",
-          borderColor: "rgba(212,175,55,.22)",
-        }}
-      >
-        <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
-          style={{ background: "linear-gradient(90deg, transparent, var(--gold), transparent)" }} />
-        <Jersey cat={cat} />
+      <div>
+        <div
+          className="relative rounded-lg border overflow-hidden aspect-square w-full max-h-[400px] md:max-h-none"
+          style={{
+            background: "linear-gradient(180deg, var(--black-3), var(--black-2))",
+            borderColor: "rgba(212,175,55,.22)",
+          }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-[3px] z-10"
+            style={{ background: "linear-gradient(90deg, transparent, var(--gold), transparent)" }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={GALLERY[imgIdx].src}
+            alt="Third Kit Mystery Box"
+            className="w-full h-full object-cover"
+            style={{ transform: `scale(${GALLERY[imgIdx].scale})`, transformOrigin: "center 47%" }}
+          />
+        </div>
+        <div className="flex gap-2.5 mt-3 justify-center">
+          {GALLERY.map((g, i) => (
+            <button key={g.src}
+              onClick={() => setImgIdx(i)}
+              className="w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden cursor-pointer flex-shrink-0"
+              style={{
+                border: i === imgIdx ? "2px solid var(--gold)" : "2px solid rgba(255,255,255,.14)",
+                opacity: i === imgIdx ? 1 : 0.7,
+                background: "var(--black-2)",
+                padding: 0,
+              }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={g.src} alt="" className="w-full h-full object-cover"
+                style={{ transform: `scale(${g.scale})` }} />
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="text-center md:text-left">

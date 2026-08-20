@@ -11,23 +11,17 @@ type Cat = "adult" | "kids";
 
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 
+// The mystery box product shot — same image for both versions (public/box.png)
 function Jersey({ cat }: { cat: Cat }) {
-  const dark = cat === "adult";
+  void cat;
   return (
-    <svg viewBox="0 0 200 200" className="w-[clamp(180px,32vh,320px)] h-auto" aria-hidden="true"
-      style={{ filter: "drop-shadow(0 16px 36px rgba(0,0,0,.55))" }}>
-      <path
-        d="M62 28 L84 18 Q100 30 116 18 L138 28 L172 52 L156 82 L142 72 L142 176 Q100 188 58 176 L58 72 L44 82 L28 52 Z"
-        fill={dark ? "#161616" : "#d4af37"}
-        stroke={dark ? "#d4af37" : "#f0cf5d"}
-        strokeWidth="3" strokeLinejoin="round"
-      />
-      <path d="M84 18 Q100 30 116 18 Q112 34 100 34 Q88 34 84 18Z" fill={dark ? "#d4af37" : "#161616"} />
-      <path d="M70 100 H130" stroke={dark ? "#d4af37" : "#0a0a0a"} strokeWidth="3" />
-      <path d="M70 112 H130" stroke={dark ? "#d4af37" : "#0a0a0a"} strokeWidth="3" />
-      <text x="100" y="82" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold"
-        fontSize="20" fill={dark ? "#f0cf5d" : "#0a0a0a"} letterSpacing="2">III</text>
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/box.png"
+      alt="Third Kit Mystery Box"
+      className="w-[clamp(200px,36vh,360px)] h-auto rounded-2xl"
+      style={{ filter: "drop-shadow(0 16px 36px rgba(0,0,0,.55))" }}
+    />
   );
 }
 

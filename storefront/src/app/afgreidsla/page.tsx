@@ -1,66 +1,48 @@
 "use client";
-// Checkout page in three steps: info → delivery choice (Dropp & co., straight
-// from Magento) → summary. Totals always come from the server, never from here.
-import { useEffect, useState } from "react";
+// ONE-PAGE checkout, joiutherji.is layout in the Third Kit theme:
+// left — personal info, address, delivery (Dropp), payment (Verifone), billing;
+// right — order summary with discount code and live totals.
+// Totals are always computed by the SERVER; this page only displays them.
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type CartItem = { uid: string; name: string; sizeLabel: string; quantity: number; rowTotal: number };
 type Cart = { items: CartItem[]; grandTotal: number };
-type Method = { carrier: string; method: string; title: string; amount: number };
 type DroppLocation = { id: string; name: string; address?: string; lat?: number; lng?: number };
+type ShipInfo = { pickup: number; home: number; homeAvailable: boolean; subtotal: number };
 
-/** Great-circle distance in km (haversine) — fine at Iceland scale. */
+const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
+
+/** Accent-insensitive contains-match so „Skeifan" finnst með „skeifan". */
+function norm(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae");
+}
+
 function distKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(bLat - aLat);
   const dLng = toRad(bLng - aLng);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 }
 
 function distLabel(km: number): string {
-  return km < 1
-    ? `${Math.round(km * 1000)} m`
-    : `${km.toFixed(1).replace(".", ",")} km`;
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1).replace(".", ",")} km`;
 }
 
-// Fallback anchor when the shopper declines geolocation: approximate centre
-// of the postcode's town, so the list is ALWAYS in distance order.
+// Fallback anchor when geolocation is declined: centre of the postcode's town
 const POSTCODE_ANCHORS: Array<[number, number, number, number]> = [
-  [100, 162, 64.135, -21.895], // Reykjavík
-  [170, 172, 64.155, -21.995], // Seltjarnarnes
-  [190, 191, 63.966, -22.375], // Vogar
-  [200, 206, 64.11, -21.9],    // Kópavogur
-  [210, 212, 64.088, -21.923], // Garðabær
-  [220, 225, 64.067, -21.95],  // Hafnarfjörður
-  [230, 262, 63.998, -22.56],  // Reykjanesbær/Suðurnes
-  [270, 277, 64.167, -21.7],   // Mosfellsbær
-  [300, 302, 64.322, -22.07],  // Akranes
-  [310, 321, 64.54, -21.92],   // Borgarnes
-  [340, 356, 65.07, -22.73],   // Stykkishólmur/Snæfellsnes
-  [360, 361, 64.92, -23.25],   // Hellissandur
-  [370, 381, 65.11, -21.77],   // Búðardalur
-  [400, 431, 66.075, -23.13],  // Ísafjörður og nágrenni
-  [450, 471, 65.59, -23.96],   // Patreksfjörður og sunnanverðir Vestfirðir
-  [500, 531, 65.395, -20.94],  // Hvammstangi
-  [540, 546, 65.66, -20.28],   // Blönduós
-  [550, 570, 65.75, -19.64],   // Sauðárkrókur
-  [580, 581, 66.15, -18.91],   // Siglufjörður
-  [600, 616, 65.68, -18.09],   // Akureyri
-  [620, 631, 65.97, -18.53],   // Dalvík/Ólafsfjörður
-  [640, 661, 66.045, -17.34],  // Húsavík
-  [670, 691, 66.3, -16.45],    // Norðausturhorn
-  [700, 701, 65.26, -14.39],   // Egilsstaðir
-  [710, 741, 65.15, -13.9],    // Firðir (Seyðisfj.–Neskaupstaður)
-  [750, 766, 64.93, -14.01],   // Suðurfirðir
-  [780, 786, 64.25, -15.21],   // Höfn
-  [800, 816, 63.93, -21.0],    // Selfoss/Hveragerði/Þorlákshöfn
-  [820, 851, 63.93, -20.6],    // Eyrarbakki–Hella
-  [860, 861, 63.75, -20.23],   // Hvolsvöllur
-  [870, 881, 63.42, -19.01],   // Vík/Klaustur
-  [900, 903, 63.44, -20.27],   // Vestmannaeyjar
+  [100, 162, 64.135, -21.895], [170, 172, 64.155, -21.995], [190, 191, 63.966, -22.375],
+  [200, 206, 64.11, -21.9], [210, 212, 64.088, -21.923], [220, 225, 64.067, -21.95],
+  [230, 262, 63.998, -22.56], [270, 277, 64.167, -21.7], [300, 302, 64.322, -22.07],
+  [310, 321, 64.54, -21.92], [340, 356, 65.07, -22.73], [360, 361, 64.92, -23.25],
+  [370, 381, 65.11, -21.77], [400, 431, 66.075, -23.13], [450, 471, 65.59, -23.96],
+  [500, 531, 65.395, -20.94], [540, 546, 65.66, -20.28], [550, 570, 65.75, -19.64],
+  [580, 581, 66.15, -18.91], [600, 616, 65.68, -18.09], [620, 631, 65.97, -18.53],
+  [640, 661, 66.045, -17.34], [670, 691, 66.3, -16.45], [700, 701, 65.26, -14.39],
+  [710, 741, 65.15, -13.9], [750, 766, 64.93, -14.01], [780, 786, 64.25, -15.21],
+  [800, 816, 63.93, -21.0], [820, 851, 63.93, -20.6], [860, 861, 63.75, -20.23],
+  [870, 881, 63.42, -19.01], [900, 903, 63.44, -20.27],
 ];
 
 function anchorForPostcode(pc: string): { lat: number; lng: number } | null {
@@ -70,70 +52,6 @@ function anchorForPostcode(pc: string): { lat: number; lng: number } | null {
     if (n >= from && n <= to) return { lat, lng };
   }
   return null;
-}
-
-/** Accent-insensitive contains-match so „Skeifan" finnst með „skeifan". */
-function norm(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae");
-}
-
-// Dropp's embeddable location picker (same integration as their official
-// WooCommerce/Shopify plugins): load the script, call chooseDroppLocation().
-const DROPP_SCRIPT = "https://app.dropp.is/dropp-locations.min.js";
-
-// The visible delivery experience is Dropp (like joiutherji.is); the Magento
-// method underneath carries the price. Raw methods map to two options:
-// Dropp pickup point (widget required) and Dropp home delivery.
-type DeliveryOption = { kind: "dropp" | "home" | "store"; label: string; method: Method; displayAmount: number };
-type DroppPrices = { pickup: number; home: number };
-
-// Prices come from the SERVER (official Dropp verðskrá via /api/checkout) —
-// the Magento method underneath only carries the choice.
-function buildOptions(methods: Method[], prices: DroppPrices | null): DeliveryOption[] {
-  const isStore = (m: Method) => /instore|pickup|verslun/i.test(`${m.carrier} ${m.method} ${m.title}`);
-  const delivery = methods.filter((m) => !isStore(m));
-  const free = delivery.find((m) => /free/i.test(m.carrier));
-  const cheapest = [...delivery].sort((a, b) => a.amount - b.amount)[0];
-  const paid = [...delivery].filter((m) => !/free/i.test(m.carrier)).sort((a, b) => a.amount - b.amount)[0];
-
-  const pickupMethod = free ?? cheapest;
-  const homeMethod = paid ?? cheapest; // verðið kemur úr töflunni — aldrei 0 fyrir heimsendingu
-
-  const options: DeliveryOption[] = [];
-  if (pickupMethod)
-    options.push({
-      kind: "dropp", label: "Dropp afhendingarstaður", method: pickupMethod,
-      displayAmount: prices ? prices.pickup : pickupMethod.amount,
-    });
-  if (homeMethod)
-    options.push({
-      kind: "home", label: "Dropp heimsending", method: homeMethod,
-      displayAmount: prices ? prices.home : homeMethod.amount,
-    });
-  if (!options.length)
-    return methods.map((m) => ({ kind: "store" as const, label: m.title, method: m, displayAmount: m.amount }));
-  return options;
-}
-
-function OptionIcon({ kind }: { kind: DeliveryOption["kind"] }) {
-  const stroke = "currentColor";
-  if (kind === "dropp")
-    return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M1 7h13v9H1zM14 10h4l4 3v3h-8" /><circle cx="6" cy="18" r="1.8" /><circle cx="18" cy="18" r="1.8" />
-      </svg>
-    );
-  if (kind === "home")
-    return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" />
-      </svg>
-    );
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 8h16l-1 4a3 3 0 0 1-3 2H8a3 3 0 0 1-3-2L4 8Z" /><path d="M5 14v6h14v-6" /><path d="M6 8 8 4h8l2 4" />
-    </svg>
-  );
 }
 
 let droppScriptPromise: Promise<void> | null = null;
@@ -150,25 +68,10 @@ function loadDroppScript(): Promise<void> {
   });
   return droppScriptPromise;
 }
-type Summary = {
-  shipping: Method;
-  grandTotal: number;
-  currency: string;
-  paymentMethods: Array<{ code: string; title: string }>;
-};
 
 const kr = (n: number) => n.toLocaleString("is-IS").replace(/,/g, ".") + " kr.";
 
-const FIELDS = [
-  { key: "email", label: "Netfang", type: "email", autoComplete: "email" },
-  { key: "firstName", label: "Fornafn", type: "text", autoComplete: "given-name" },
-  { key: "lastName", label: "Eftirnafn", type: "text", autoComplete: "family-name" },
-  { key: "address", label: "Heimilisfang", type: "text", autoComplete: "street-address" },
-  { key: "postalCode", label: "Póstnúmer", type: "text", autoComplete: "postal-code" },
-  { key: "phone", label: "Símanúmer", type: "tel", autoComplete: "tel" },
-] as const;
-
-type FieldKey = (typeof FIELDS)[number]["key"];
+type FieldKey = "email" | "firstName" | "lastName" | "address" | "postalCode" | "phone";
 
 function errorText(data: {
   error?: string;
@@ -190,125 +93,89 @@ function errorText(data: {
   }
   switch (data.error) {
     case "EMPTY_CART": return "Karfan er tóm — veldu vöru fyrst.";
-    case "NO_SHIPPING_METHODS": return "Heimilisfangið virðist ekki gilt — athugaðu póstnúmer og sveitarfélag.";
+    case "NO_SHIPPING_METHODS": return "Heimilisfangið virðist ekki gilt — athugaðu póstnúmerið.";
     case "INVALID_EMAIL": return "Netfangið lítur ekki rétt út.";
     case "MISSING_FIELD": return "Það vantar í reitina — fylltu alla út.";
-    case "INVALID_SHIPPING": return "Veldu afhendingarmáta aftur.";
+    case "INVALID_SHIPPING": return "Veldu afhendingarmáta og Dropp-stað.";
     case "INVALID_POSTCODE": return "Þetta póstnúmer er ekki til — athugaðu heimilisfangið.";
     case "HOME_DELIVERY_UNAVAILABLE":
       return "Dropp heimsending er ekki í boði fyrir þetta póstnúmer — veldu Dropp afhendingarstað í staðinn.";
+    case "SHIPPING_PRICE_FAILED":
+      return "Ekki tókst að skrá sendingarverðið — reyndu aftur eftir augnablik.";
+    case "PAYMENT_METHOD_UNAVAILABLE":
+      return "Engin greiðsluleið tiltæk á körfunni — láttu okkur vita.";
     default: return "Eitthvað fór úrskeiðis — reyndu aftur." + (data.detail ? ` [${data.detail}]` : "");
   }
 }
 
+const sectionTitle = "text-[1.05rem] font-bold mb-3 mt-8 first:mt-0";
+
 export default function CheckoutPage() {
-  const [step, setStep] = useState<"form" | "methods" | "summary">("form");
   const [cart, setCart] = useState<Cart | null>(null);
   const [form, setForm] = useState<Record<FieldKey, string>>({
     email: "", firstName: "", lastName: "", address: "", postalCode: "", phone: "",
   });
-  const [options, setOptions] = useState<DeliveryOption[]>([]);
-  const [picked, setPicked] = useState<DeliveryOption | null>(null);
+  const [picked, setPicked] = useState<"dropp" | "home">("dropp");
   const [droppLoc, setDroppLoc] = useState<DroppLocation | null>(null);
   const [droppList, setDroppList] = useState<DroppLocation[] | null>(null);
   const [droppListFailed, setDroppListFailed] = useState(false);
+  const [droppOpen, setDroppOpen] = useState(false);
   const [droppQuery, setDroppQuery] = useState("");
-  // Browser geolocation → distance-sorted pickup list. "denied" falls back to search.
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoStatus, setGeoStatus] = useState<"idle" | "asking" | "ok" | "denied">("idle");
-  const [droppOpen, setDroppOpen] = useState(false);
-  // null = still checking; true/false = Dropp's deliveryzips answer
-  const [homeAvailable, setHomeAvailable] = useState<boolean | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [ship, setShip] = useState<ShipInfo | null>(null);
+  const [coupon, setCoupon] = useState("");
+  const [couponState, setCouponState] = useState<"none" | "busy" | "applied" | "invalid">("none");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load cart + Dropp locations + warm the address registry once
   useEffect(() => {
-    fetch("/api/cart")
-      .then((r) => (r.ok ? r.json() : null))
-      .then(setCart)
-      .catch(() => {});
-    // Warm the address registry so validation is instant when the form submits
+    fetch("/api/cart").then((r) => (r.ok ? r.json() : null)).then(setCart).catch(() => {});
     fetch("/api/address-check?warm=1").catch(() => {});
-  }, []);
-
-  async function post(payload: object) {
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw data;
-    return data;
-  }
-
-  async function submitInfo(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const data = await post(form);
-      const opts = buildOptions(data.methods as Method[], (data.droppPrices as DroppPrices) ?? null);
-      setOptions(opts);
-      setPicked(opts[0] ?? null); // Dropp preselected
-      setStep("methods");
-      // Dropp's own rule: heimsending only exists for postcodes on their
-      // deliveryzips list — grey the option out right away if not.
-      setHomeAvailable(null);
-      fetch(`/api/dropp-zips?postcode=${encodeURIComponent(form.postalCode.trim())}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((z) => setHomeAvailable(z ? Boolean(z.available) : true))
-        .catch(() => setHomeAvailable(true)); // never block on an outage
-    } catch (data) {
-      setError(errorText(data as { error?: string; detail?: string }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // If heimsending turns out not to exist for the postcode while it's the
-  // selected option, snap back to the Dropp pickup-point option.
-  useEffect(() => {
-    if (homeAvailable === false && picked?.kind === "home") {
-      setPicked(options.find((o) => o.kind === "dropp") ?? null);
-    }
-  }, [homeAvailable, picked, options]);
-
-  // Load the full pickup-point list once, first time Dropp is the chosen kind.
-  useEffect(() => {
-    if (picked?.kind !== "dropp" || droppList !== null || droppListFailed) return;
     fetch("/api/dropp-locations")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data) => setDroppList((data.locations ?? []) as DroppLocation[]))
-      .catch(() => setDroppListFailed(true)); // fall back to the map widget
-  }, [picked, droppList, droppListFailed]);
+      .catch(() => setDroppListFailed(true));
+  }, []);
 
-  // Ask for the shopper's location once the Dropp option is active
+  // Live shipping price whenever the postcode is complete (and after coupons)
   useEffect(() => {
-    if (picked?.kind !== "dropp" || geoStatus !== "idle") return;
+    if (!/^\d{3}$/.test(form.postalCode.trim())) { setShip(null); return; }
+    if (shipTimer.current) clearTimeout(shipTimer.current);
+    shipTimer.current = setTimeout(() => {
+      fetch(`/api/shipping-price?postcode=${encodeURIComponent(form.postalCode.trim())}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => d && setShip(d as ShipInfo))
+        .catch(() => {});
+    }, 350);
+  }, [form.postalCode, cart]);
+
+  // Home delivery doesn't exist for this postcode → snap back to pickup
+  useEffect(() => {
+    if (ship && !ship.homeAvailable && picked === "home") setPicked("dropp");
+  }, [ship, picked]);
+
+  // Geolocation the first time the location dropdown opens
+  useEffect(() => {
+    if (!droppOpen || geoStatus !== "idle") return;
     if (!("geolocation" in navigator)) { setGeoStatus("denied"); return; }
     setGeoStatus("asking");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGeoStatus("ok");
-      },
+      (pos) => { setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGeoStatus("ok"); },
       () => setGeoStatus("denied"),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 }
     );
-  }, [picked, geoStatus]);
+  }, [droppOpen, geoStatus]);
 
-  // One list for the dropdown: filtered by the search text, sorted by
-  // distance when we know where the shopper is, alphabetically otherwise.
+  // Distance-ordered list: GPS → dropp point in own postcode → town centre
   const droppDisplay = (() => {
     if (!droppList) return [];
     const q = droppQuery.trim();
     const base = q.length >= 2
       ? droppList.filter((l) => norm(`${l.name} ${l.address ?? ""}`).includes(norm(q)))
       : droppList;
-    // ALWAYS distance-ordered: GPS if granted, otherwise the centre of the
-    // shopper's own postcode. Own-postcode locations still float to the top.
     const myPost = form.postalCode.trim();
     const pos =
       userPos ??
@@ -320,10 +187,8 @@ export default function CheckoutPage() {
       })();
     const withKm = base.map((l) => ({
       ...l,
-      km:
-        pos && typeof l.lat === "number" && typeof l.lng === "number"
-          ? distKm(pos.lat, pos.lng, l.lat, l.lng)
-          : null,
+      km: pos && typeof l.lat === "number" && typeof l.lng === "number"
+        ? distKm(pos.lat, pos.lng, l.lat, l.lng) : null,
       inMyPost: myPost.length === 3 && (l.address ?? "").includes(myPost) ? 0 : 1,
     }));
     withKm.sort((a, b) => {
@@ -349,45 +214,66 @@ export default function CheckoutPage() {
     }
   }
 
-  async function confirmShipping() {
-    if (!picked) return;
-    if (picked.kind === "dropp" && !droppLoc) {
-      setError("Veldu Dropp-afhendingarstað fyrst.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
+  async function applyCoupon() {
+    if (!coupon.trim()) return;
+    setCouponState("busy");
     try {
-      const data = await post({
-        ...form,
-        shipping: { carrier: picked.method.carrier, method: picked.method.method },
-        deliveryKind: picked.kind,
-        ...(picked.kind === "dropp" && droppLoc ? { droppLocation: droppLoc } : {}),
+      const res = await fetch("/api/coupon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: coupon }),
       });
-      setSummary(data);
-      setStep("summary");
-    } catch (data) {
-      setError(errorText(data as { error?: string; detail?: string }));
-    } finally {
-      setBusy(false);
+      const data = await res.json();
+      if (!res.ok) { setCouponState("invalid"); return; }
+      setCart(data.cart);
+      setCouponState("applied");
+    } catch {
+      setCouponState("invalid");
     }
   }
 
-  async function startPayment() {
-    setBusy(true);
-    setError(null);
+  async function removeCoupon() {
+    setCouponState("busy");
     try {
-      const res = await fetch("/api/pay", { method: "POST" });
+      const res = await fetch("/api/coupon", { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) {
-        setError(
-          data.error === "PAYMENT_METHOD_UNAVAILABLE"
-            ? "Engin greiðsluleið tiltæk á körfunni — láttu okkur vita."
-            : errorText(data)
-        );
-        return;
-      }
-      window.location.href = data.redirectUrl;
+      if (res.ok) setCart(data.cart);
+    } finally {
+      setCoupon("");
+      setCouponState("none");
+    }
+  }
+
+  async function klaraPontun() {
+    setError(null);
+    // client-side pre-checks (the server re-validates everything)
+    for (const k of ["email", "firstName", "lastName", "address", "postalCode", "phone"] as FieldKey[]) {
+      if (!form[k].trim()) { setError("Það vantar í reitina — fylltu alla út."); return; }
+    }
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) { setError("Netfangið lítur ekki rétt út."); return; }
+    if (picked === "dropp" && !droppLoc) { setError("Veldu Dropp-afhendingarstað fyrst."); return; }
+
+    setBusy(true);
+    try {
+      // Steps 3–7 on the server: address, stock, setDroppOnCart, method, totals
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          shipping: { carrier: "auto", method: "auto" },
+          deliveryKind: picked,
+          ...(picked === "dropp" && droppLoc ? { droppLocation: droppLoc } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(errorText(data)); return; }
+
+      // Payment session (Verifone hosted checkout / sandbox) and off we go
+      const pay = await fetch("/api/pay", { method: "POST" });
+      const payData = await pay.json();
+      if (!pay.ok) { setError(errorText(payData)); return; }
+      window.location.href = payData.redirectUrl;
     } catch {
       setError("Eitthvað fór úrskeiðis — reyndu aftur.");
     } finally {
@@ -400,36 +286,252 @@ export default function CheckoutPage() {
     border: "1.5px solid rgba(255,255,255,.18)",
     color: "var(--text)",
   } as const;
+  const inputCls = "w-full rounded-xl px-4 py-3 text-[0.95rem] outline-none focus:border-[var(--gold)]";
+
+  const subtotal = cart ? cart.items.reduce((s, i) => s + i.rowTotal, 0) : 0;
+  const discount = cart ? Math.max(0, subtotal - cart.grandTotal) : 0;
+  const shipPrice = ship ? (picked === "dropp" ? ship.pickup : ship.home) : null;
+  const total = cart ? cart.grandTotal + (shipPrice ?? 0) : 0;
 
   return (
-    <section className="flex-1 flex flex-col items-center px-[6vw] pt-24 pb-20 overflow-y-auto">
-      <Link href="/karfa" className="mb-4 text-[0.75rem] tracking-[0.22em] uppercase" style={{ color: "var(--muted)" }}>
-        ← Aftur í körfuna
-      </Link>
+    <section className="flex-1 px-[5vw] pt-24 pb-20 overflow-y-auto">
+      <div className="grid md:grid-cols-[1fr_400px] gap-10 xl:gap-16 w-full max-w-[1240px] mx-auto items-start">
 
-      <div
-        className="relative w-full max-w-[560px] rounded-md border p-7 md:p-10 overflow-hidden"
-        style={{
-          background: "linear-gradient(180deg, var(--black-3), var(--black-2))",
-          borderColor: "rgba(212,175,55,.22)",
-        }}
-      >
-        <div className="absolute top-0 left-0 right-0 h-[3px]"
-          style={{ background: "linear-gradient(90deg, transparent, var(--gold), transparent)" }} />
+        {/* ————— LEFT: the form ————— */}
+        <div className="text-left">
+          <h2 className={sectionTitle}>Persónuupplýsingar</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input className={`${inputCls} md:col-span-2`} style={inputStyle} type="email" placeholder="Netfang *"
+              autoComplete="email" value={form.email}
+              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} />
+            <input className={inputCls} style={inputStyle} type="text" placeholder="Fornafn *"
+              autoComplete="given-name" value={form.firstName}
+              onChange={(e) => setForm((s) => ({ ...s, firstName: e.target.value }))} />
+            <input className={inputCls} style={inputStyle} type="text" placeholder="Eftirnafn *"
+              autoComplete="family-name" value={form.lastName}
+              onChange={(e) => setForm((s) => ({ ...s, lastName: e.target.value }))} />
+            <input className={`${inputCls} md:col-span-2`} style={inputStyle} type="tel" placeholder="Sími *"
+              autoComplete="tel" value={form.phone}
+              onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} />
+          </div>
 
-        <h1 className="uppercase font-extrabold tracking-[0.2em] text-xl mb-5 text-center">
-          Afgreiðsla<span style={{ color: "var(--gold)" }}>.</span>
-        </h1>
+          <h2 className={sectionTitle}>Heimilisfang</h2>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px] gap-3">
+            <input className={inputCls} style={inputStyle} type="text" placeholder="Heimilisfang *"
+              autoComplete="street-address" value={form.address}
+              onChange={(e) => setForm((s) => ({ ...s, address: e.target.value }))} />
+            <input className={inputCls} style={inputStyle} type="text" placeholder="Póstnúmer *"
+              autoComplete="postal-code" value={form.postalCode}
+              onChange={(e) => setForm((s) => ({ ...s, postalCode: e.target.value }))} />
+          </div>
 
-        {/* Order summary from the real Magento cart */}
-        <div className="mb-6 pb-4 border-b" style={{ borderColor: "rgba(255,255,255,.08)" }}>
+          <h2 className={sectionTitle}>Afhendingarmáti</h2>
+          <div className="flex flex-col gap-2.5">
+            {([
+              { kind: "dropp" as const, label: "Dropp afhendingarstaður", price: ship?.pickup ?? null, disabled: false },
+              {
+                kind: "home" as const, label: "Dropp heimsending", price: ship?.home ?? null,
+                disabled: ship ? !ship.homeAvailable : false,
+              },
+            ]).map((o) => {
+              const selected = picked === o.kind && !o.disabled;
+              return (
+                <button key={o.kind}
+                  onClick={() => !o.disabled && setPicked(o.kind)}
+                  disabled={o.disabled}
+                  className="flex items-center gap-3 w-full rounded-xl px-4 py-3.5 text-left"
+                  style={{
+                    background: selected ? "rgba(212,175,55,.10)" : "var(--black-2)",
+                    color: "var(--text)",
+                    border: selected ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
+                    opacity: o.disabled ? 0.45 : 1,
+                    cursor: o.disabled ? "not-allowed" : "pointer",
+                  }}>
+                  <span className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center"
+                    style={{ border: selected ? "2px solid var(--gold)" : "2px solid rgba(255,255,255,.35)" }}>
+                    {selected && <span className="w-[9px] h-[9px] rounded-full" style={{ background: "var(--gold)" }} />}
+                  </span>
+                  <span className="flex-1 text-[0.95rem]" style={{ fontWeight: selected ? 700 : 500 }}>
+                    {o.label}
+                    <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>
+                      {o.disabled
+                        ? `Ekki í boði fyrir póstnúmer ${form.postalCode.trim()}`
+                        : o.price === null ? "Sláðu inn póstnúmer fyrir verð"
+                          : o.price === 0 ? "Frítt" : kr(o.price)}
+                    </span>
+                  </span>
+                  <span className="font-extrabold lowercase text-[1.05rem] tracking-tight flex-shrink-0">dropp</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-[0.82rem] leading-relaxed" style={{ color: "var(--muted)" }}>
+            Ef þú verslar yfir {kr(Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD ?? 15000))} bjóðum
+            við þér að senda pakkann frítt á næsta Dropp afhendingarstað!
+          </p>
+
+          {picked === "dropp" && (
+            <div className="mt-5">
+              <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+                Afhendingarstaðir
+              </div>
+              {droppLoc ? (
+                <div className="flex justify-between items-center rounded-xl px-4 py-3.5"
+                  style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)" }}>
+                  <span className="text-[0.9rem]">
+                    <span className="font-bold">{droppLoc.name}</span>
+                    {droppLoc.address && <span style={{ color: "var(--muted)" }}> — {droppLoc.address}</span>}
+                  </span>
+                  <button onClick={() => { setDroppLoc(null); setDroppQuery(""); setDroppOpen(true); }}
+                    className="text-[0.72rem] tracking-[0.16em] uppercase cursor-pointer"
+                    style={{ background: "none", border: "none", color: "var(--gold)" }}>
+                    Breyta
+                  </button>
+                </div>
+              ) : droppListFailed ? (
+                <button onClick={pickDroppLocation} className="w-full rounded-xl px-4 py-3.5 cursor-pointer font-bold text-[0.9rem]"
+                  style={{ background: "var(--black-2)", border: "1.5px dashed var(--gold-dim)", color: "var(--gold-bright)" }}>
+                  Veldu Dropp-afhendingarstað á korti
+                </button>
+              ) : (
+                <div>
+                  <button
+                    onClick={() => setDroppOpen((o) => !o)}
+                    disabled={droppList === null}
+                    className="flex items-center justify-between w-full rounded-xl px-4 py-3.5 cursor-pointer text-[0.95rem]"
+                    style={{
+                      background: "var(--black-2)",
+                      border: droppOpen ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
+                      color: droppList === null ? "var(--muted)" : "var(--text)",
+                    }}>
+                    <span>{droppList === null ? "Sæki afhendingarstaði…" : "Veldu Dropp-afhendingarstað"}</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                      style={{ transform: droppOpen ? "rotate(180deg)" : "none", transition: "transform .15s", color: "var(--gold)" }}>
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  {droppOpen && droppList && (
+                    <div className="mt-2 rounded-xl p-2"
+                      style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.14)" }}>
+                      <input type="text" value={droppQuery} onChange={(e) => setDroppQuery(e.target.value)}
+                        placeholder="Sía eftir nafni eða stað…"
+                        className="w-full rounded-lg px-3 py-2.5 mb-2 text-[0.9rem] outline-none focus:border-[var(--gold)]"
+                        style={inputStyle} />
+                      {geoStatus === "asking" && (
+                        <p className="text-[0.78rem] px-1 pb-1" style={{ color: "var(--muted)" }}>
+                          Sæki staðsetningu til að raða eftir fjarlægð…
+                        </p>
+                      )}
+                      <div className="flex flex-col gap-1 overflow-y-auto pr-1" style={{ maxHeight: 260 }}>
+                        {droppDisplay.map((l) => (
+                          <button key={l.id}
+                            onClick={() => { setDroppLoc(l); setDroppOpen(false); setError(null); }}
+                            className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left cursor-pointer text-[0.9rem]"
+                            style={{ background: "transparent", border: "none", color: "var(--text)" }}>
+                            <span className="flex-1">
+                              <span className="font-bold">{l.name}</span>
+                              {l.address && (
+                                <span className="block text-[0.76rem] mt-0.5" style={{ color: "var(--muted)" }}>{l.address}</span>
+                              )}
+                            </span>
+                            {l.km !== null && (
+                              <span className="flex-shrink-0 text-[0.78rem] font-bold" style={{ color: "var(--gold-bright)" }}>
+                                {distLabel(l.km)}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                        {!droppDisplay.length && (
+                          <p className="text-[0.82rem] px-1 py-2" style={{ color: "var(--muted)" }}>
+                            Enginn afhendingarstaður fannst — prófaðu annað leitarorð.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {picked === "home" && form.address.trim() && (
+            <div className="mt-5">
+              <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
+                Sent heim á
+              </div>
+              <div className="rounded-xl px-4 py-3.5"
+                style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)" }}>
+                <span className="text-[0.9rem] font-bold">{form.address}</span>
+                <span className="block text-[0.82rem] mt-0.5" style={{ color: "var(--muted)" }}>{form.postalCode}</span>
+              </div>
+            </div>
+          )}
+
+          <h2 className={sectionTitle}>Greiðslumáti</h2>
+          <div className="rounded-xl overflow-hidden"
+            style={{ border: "1.5px solid var(--gold)", background: "rgba(212,175,55,.06)" }}>
+            <div className="flex items-center gap-3 px-4 py-3.5">
+              <span className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center"
+                style={{ border: "2px solid var(--gold)" }}>
+                <span className="w-[9px] h-[9px] rounded-full" style={{ background: "var(--gold)" }} />
+              </span>
+              <span className="flex-1 font-bold text-[0.95rem]">Verifone Checkout</span>
+              <span className="flex gap-1.5">
+                {["VISA", "MC", "AMEX"].map((c) => (
+                  <span key={c} className="text-[0.6rem] font-extrabold px-1.5 py-0.5 rounded"
+                    style={{ background: "var(--black-2)", border: "1px solid rgba(255,255,255,.2)", color: "var(--muted)" }}>
+                    {c}
+                  </span>
+                ))}
+              </span>
+            </div>
+            <div className="mx-4 mb-4 rounded-lg px-4 py-5 text-center text-[0.85rem] leading-relaxed"
+              style={{ background: "var(--black-2)", color: "var(--muted)" }}>
+              Þegar þú smellir á „Klára pöntun" ertu send/ur á örugga greiðslusíðu
+              Verifone þar sem þú lýkur kaupunum.
+            </div>
+          </div>
+
+          <h2 className={sectionTitle}>Reikningsfang</h2>
+          <div className="flex items-center gap-3 rounded-xl px-4 py-3.5"
+            style={{ background: "rgba(212,175,55,.06)", border: "1.5px solid var(--gold)" }}>
+            <span className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center"
+              style={{ border: "2px solid var(--gold)" }}>
+              <span className="w-[9px] h-[9px] rounded-full" style={{ background: "var(--gold)" }} />
+            </span>
+            <span className="text-[0.92rem]">Heimilisfang greiðanda er það sama og viðtakanda</span>
+          </div>
+
+          {error && <p className="mt-5 text-[0.85rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
+
+          <button className="btn-gold w-full mt-6" onClick={klaraPontun}
+            disabled={busy || !cart?.items.length}>
+            {busy ? "Augnablik…" : "Klára pöntun"}
+          </button>
+          <p className="mt-3 text-[0.7rem] tracking-[0.08em] text-center" style={{ color: "var(--muted)" }}>
+            Með því að klára pöntun samþykkir þú <Link href="/skilmalar" style={{ color: "var(--gold)" }}>skilmála</Link> verslunarinnar
+          </p>
+        </div>
+
+        {/* ————— RIGHT: order summary ————— */}
+        <div className="rounded-md border p-6 md:sticky md:top-24"
+          style={{
+            background: "linear-gradient(180deg, var(--black-3), var(--black-2))",
+            borderColor: "rgba(212,175,55,.22)",
+          }}>
+          <h2 className="text-[1.05rem] font-bold mb-4">Samantekt pöntunar</h2>
+
           {cart?.items.map((i) => (
-            <div key={i.uid} className="flex justify-between text-[0.88rem] py-1">
-              <span>
+            <div key={i.uid} className="flex items-center gap-3 py-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/box.png" alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                style={{ transform: "scale(1.0)", border: "1px solid rgba(255,255,255,.12)" }} />
+              <span className="flex-1 text-[0.88rem] leading-snug">
                 {i.name}
                 {i.sizeLabel ? ` — ${i.sizeLabel}` : ""} × {i.quantity}
               </span>
-              <span className="font-bold">{kr(i.rowTotal)}</span>
+              <span className="font-bold text-[0.9rem]">{kr(i.rowTotal)}</span>
             </div>
           ))}
           {cart && !cart.items.length && (
@@ -437,250 +539,57 @@ export default function CheckoutPage() {
               Karfan er tóm — <Link href="/" style={{ color: "var(--gold)" }}>veldu vöru fyrst</Link>.
             </p>
           )}
+
+          <div className="flex gap-2 mt-4">
+            <input className={inputCls} style={inputStyle} type="text" placeholder="Afsláttarkóði"
+              value={coupon} disabled={couponState === "applied" || couponState === "busy"}
+              onChange={(e) => { setCoupon(e.target.value); if (couponState === "invalid") setCouponState("none"); }} />
+            {couponState === "applied" ? (
+              <button onClick={removeCoupon} className="rounded-xl px-4 text-[0.75rem] tracking-[0.1em] uppercase cursor-pointer flex-shrink-0"
+                style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)", color: "var(--gold-bright)" }}>
+                Fjarlægja
+              </button>
+            ) : (
+              <button onClick={applyCoupon} disabled={couponState === "busy" || !coupon.trim()}
+                className="rounded-xl px-4 text-[0.75rem] tracking-[0.1em] uppercase cursor-pointer flex-shrink-0 disabled:opacity-40"
+                style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.2)", color: "var(--text)" }}>
+                {couponState === "busy" ? "…" : "Virkja"}
+              </button>
+            )}
+          </div>
+          {couponState === "invalid" && (
+            <p className="mt-2 text-[0.78rem]" style={{ color: "var(--gold-bright)" }}>Kóðinn er ekki gildur.</p>
+          )}
+          {couponState === "applied" && (
+            <p className="mt-2 text-[0.78rem]" style={{ color: "var(--gold-bright)" }}>Afsláttarkóði virkur ✓</p>
+          )}
+
+          <div className="mt-5 pt-4 border-t" style={{ borderColor: "rgba(255,255,255,.1)" }}>
+            <div className="flex justify-between text-[0.88rem] py-1">
+              <span style={{ color: "var(--muted)" }}>Vörur samtals:</span>
+              <span>{kr(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-[0.88rem] py-1">
+                <span style={{ color: "var(--muted)" }}>Afsláttur:</span>
+                <span style={{ color: "var(--gold-bright)" }}>−{kr(discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-[0.88rem] py-1">
+              <span style={{ color: "var(--muted)" }}>Sendingarkostnaður:</span>
+              <span>{shipPrice === null ? "—" : shipPrice === 0 ? "Frítt" : kr(shipPrice)}</span>
+            </div>
+            <div className="flex justify-between items-center pt-3 mt-2 border-t" style={{ borderColor: "rgba(255,255,255,.1)" }}>
+              <span className="font-bold">Samtals:</span>
+              <span className="font-extrabold text-xl" style={{ color: "var(--gold-bright)" }}>{kr(total)}</span>
+            </div>
+          </div>
+
+          <Link href="/karfa" className="block mt-4 text-[0.72rem] tracking-[0.18em] uppercase text-center"
+            style={{ color: "var(--muted)" }}>
+            ← Breyta körfu
+          </Link>
         </div>
-
-        {step === "form" && (
-          <form onSubmit={submitInfo} className="text-left">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {FIELDS.map((f) => (
-                <label key={f.key} className={f.key === "email" || f.key === "address" ? "md:col-span-2" : ""}>
-                  <span className="block mb-1 text-[0.68rem] font-bold tracking-[0.2em] uppercase" style={{ color: "var(--muted)" }}>
-                    {f.label}
-                  </span>
-                  <input
-                    type={f.type}
-                    autoComplete={f.autoComplete}
-                    required
-                    value={form[f.key]}
-                    onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
-                    className="w-full rounded-xl px-4 py-3 text-[0.95rem] outline-none focus:border-[var(--gold)]"
-                    style={inputStyle}
-                  />
-                </label>
-              ))}
-            </div>
-
-            {error && <p className="mt-4 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
-
-            <button type="submit" className="btn-gold w-full mt-6" disabled={busy || !cart?.items.length}>
-              {busy ? "Augnablik…" : "Áfram í afhendingu"}
-            </button>
-          </form>
-        )}
-
-        {step === "methods" && (
-          <div className="text-left">
-            <div className="mb-3 text-[0.95rem] font-bold" style={{ color: "var(--text)" }}>
-              Afhendingarmáti
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {options.map((o) => {
-                const disabled = o.kind === "home" && homeAvailable === false;
-                const selected = picked === o && !disabled;
-                return (
-                  <button
-                    key={o.kind + o.method.carrier + o.method.method}
-                    onClick={() => !disabled && setPicked(o)}
-                    disabled={disabled}
-                    className="flex items-center gap-3 w-full rounded-xl px-4 py-3.5 text-left"
-                    style={{
-                      background: selected ? "rgba(212,175,55,.10)" : "var(--black-2)",
-                      color: "var(--text)",
-                      border: selected ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
-                      opacity: disabled ? 0.45 : 1,
-                      cursor: disabled ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <span className="w-[18px] h-[18px] rounded-full flex-shrink-0 flex items-center justify-center"
-                      style={{ border: selected ? "2px solid var(--gold)" : "2px solid rgba(255,255,255,.35)" }}>
-                      {selected && <span className="w-[9px] h-[9px] rounded-full" style={{ background: "var(--gold)" }} />}
-                    </span>
-                    <span className="flex-1 text-[0.95rem]" style={{ fontWeight: selected ? 700 : 500 }}>
-                      {o.label}
-                      <span className="block text-[0.78rem] mt-0.5" style={{ color: "var(--muted)" }}>
-                        {disabled
-                          ? `Ekki í boði fyrir póstnúmer ${form.postalCode.trim()}`
-                          : o.displayAmount === 0 ? "Frítt" : kr(o.displayAmount)}
-                      </span>
-                    </span>
-                    {o.kind !== "store" && (
-                      <span className="font-extrabold lowercase text-[1.05rem] tracking-tight flex-shrink-0">dropp</span>
-                    )}
-                    <span className="flex-shrink-0" style={{ color: selected ? "var(--gold-bright)" : "var(--muted)" }}>
-                      <OptionIcon kind={o.kind} />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-[0.82rem] leading-relaxed" style={{ color: "var(--muted)" }}>
-              Ef þú verslar yfir {kr(Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD ?? 15000))} bjóðum
-              við þér að senda pakkann frítt á næsta Dropp afhendingarstað!
-            </p>
-
-            {picked?.kind === "dropp" && (
-              <div className="mt-5">
-                <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
-                  Dropp-afhendingarstaður
-                </div>
-                {droppLoc ? (
-                  <div className="flex justify-between items-center rounded-xl px-4 py-3.5"
-                    style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)" }}>
-                    <span className="text-[0.9rem]">
-                      <span className="font-bold">{droppLoc.name}</span>
-                      {droppLoc.address && <span style={{ color: "var(--muted)" }}> — {droppLoc.address}</span>}
-                    </span>
-                    <button onClick={() => { setDroppLoc(null); setDroppQuery(""); setDroppOpen(true); }}
-                      className="text-[0.72rem] tracking-[0.16em] uppercase cursor-pointer"
-                      style={{ background: "none", border: "none", color: "var(--gold)" }}>
-                      Breyta
-                    </button>
-                  </div>
-                ) : droppListFailed ? (
-                  // Location list unreachable — the map widget still works
-                  <button onClick={pickDroppLocation} className="w-full rounded-xl px-4 py-3.5 cursor-pointer font-bold text-[0.9rem]"
-                    style={{ background: "var(--black-2)", border: "1.5px dashed var(--gold-dim)", color: "var(--gold-bright)" }}>
-                    Veldu Dropp-afhendingarstað á korti
-                  </button>
-                ) : (
-                  <div>
-                    {/* Dropdown trigger with a chevron */}
-                    <button
-                      onClick={() => setDroppOpen((o) => !o)}
-                      disabled={droppList === null}
-                      className="flex items-center justify-between w-full rounded-xl px-4 py-3.5 cursor-pointer text-[0.95rem]"
-                      style={{
-                        background: "var(--black-2)",
-                        border: droppOpen ? "1.5px solid var(--gold)" : "1.5px solid rgba(255,255,255,.18)",
-                        color: droppList === null ? "var(--muted)" : "var(--text)",
-                      }}
-                    >
-                      <span>{droppList === null ? "Sæki afhendingarstaði…" : "Veldu Dropp-afhendingarstað"}</span>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-                        style={{ transform: droppOpen ? "rotate(180deg)" : "none", transition: "transform .15s", color: "var(--gold)" }}>
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
-
-                    {droppOpen && droppList && (
-                      <div className="mt-2 rounded-xl p-2"
-                        style={{ background: "var(--black-2)", border: "1.5px solid rgba(255,255,255,.14)" }}>
-                        <input
-                          type="text"
-                          value={droppQuery}
-                          onChange={(e) => setDroppQuery(e.target.value)}
-                          placeholder="Sía eftir nafni eða stað…"
-                          className="w-full rounded-lg px-3 py-2.5 mb-2 text-[0.9rem] outline-none focus:border-[var(--gold)]"
-                          style={inputStyle}
-                        />
-                        {geoStatus === "asking" && (
-                          <p className="text-[0.78rem] px-1 pb-1" style={{ color: "var(--muted)" }}>
-                            Sæki staðsetningu til að raða eftir fjarlægð…
-                          </p>
-                        )}
-                        <div className="flex flex-col gap-1 overflow-y-auto pr-1" style={{ maxHeight: 260 }}>
-                          {droppDisplay.map((l) => (
-                            <button key={l.id}
-                              onClick={() => { setDroppLoc(l); setDroppOpen(false); setError(null); }}
-                              className="flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-left cursor-pointer text-[0.9rem]"
-                              style={{ background: "transparent", border: "none", color: "var(--text)" }}>
-                              <span className="flex-1">
-                                <span className="font-bold">{l.name}</span>
-                                {l.address && (
-                                  <span className="block text-[0.76rem] mt-0.5" style={{ color: "var(--muted)" }}>{l.address}</span>
-                                )}
-                              </span>
-                              {l.km !== null && (
-                                <span className="flex-shrink-0 text-[0.78rem] font-bold" style={{ color: "var(--gold-bright)" }}>
-                                  {distLabel(l.km)}
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                          {!droppDisplay.length && (
-                            <p className="text-[0.82rem] px-1 py-2" style={{ color: "var(--muted)" }}>
-                              Enginn afhendingarstaður fannst — prófaðu annað leitarorð.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {picked?.kind === "home" && (
-              <div className="mt-5">
-                <div className="mb-2 text-[0.72rem] font-bold tracking-[0.26em] uppercase" style={{ color: "var(--muted)" }}>
-                  Sent heim á
-                </div>
-                <div className="rounded-xl px-4 py-3.5"
-                  style={{ background: "var(--black-2)", border: "1.5px solid var(--gold-dim)" }}>
-                  <span className="text-[0.9rem] font-bold">{form.address}</span>
-                  <span className="block text-[0.82rem] mt-0.5" style={{ color: "var(--muted)" }}>
-                    {form.postalCode}
-                  </span>
-                </div>
-                <p className="mt-2 text-[0.78rem]" style={{ color: "var(--muted)" }}>
-                  Ekki rétt? <button onClick={() => setStep("form")} className="cursor-pointer underline"
-                    style={{ background: "none", border: "none", color: "var(--gold)", padding: 0 }}>
-                    Breyta heimilisfangi
-                  </button>
-                </p>
-              </div>
-            )}
-
-            {error && <p className="mt-4 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
-
-            <button className="btn-gold w-full mt-6" onClick={confirmShipping}
-              disabled={busy || !picked || (picked.kind === "dropp" && !droppLoc)}>
-              {busy ? "Augnablik…" : "Áfram"}
-            </button>
-            <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
-              style={{ background: "none", border: "none", color: "var(--muted)" }}
-              onClick={() => setStep("form")}>
-              ← Breyta upplýsingum
-            </button>
-          </div>
-        )}
-
-        {step === "summary" && summary && (
-          <div className="text-left">
-            <div className="flex justify-between text-[0.9rem] py-1.5">
-              <span style={{ color: "var(--muted)" }}>
-                Sending — {picked?.kind === "dropp" ? "Dropp" : picked?.label ?? summary.shipping.title}
-              </span>
-              <span className="font-bold">{summary.shipping.amount === 0 ? "Frítt" : kr(summary.shipping.amount)}</span>
-            </div>
-            {droppLoc && picked?.kind === "dropp" && (
-              <div className="text-[0.85rem] py-1" style={{ color: "var(--muted)" }}>
-                Afhent í: <span style={{ color: "var(--text)" }}>{droppLoc.name}</span>
-                {droppLoc.address ? ` — ${droppLoc.address}` : ""}
-              </div>
-            )}
-            <div className="flex justify-between items-center pt-3 mt-2 border-t" style={{ borderColor: "rgba(255,255,255,.08)" }}>
-              <span className="text-[0.72rem] tracking-[0.2em] uppercase" style={{ color: "var(--muted)" }}>Samtals</span>
-              <span className="font-extrabold text-2xl" style={{ color: "var(--gold-bright)" }}>
-                {kr(summary.grandTotal)}
-              </span>
-            </div>
-            <p className="mt-5 text-[0.85rem] leading-relaxed" style={{ color: "var(--muted)" }}>
-              {summary.paymentMethods.length > 0 &&
-                `Greiðsluleiðir í boði: ${summary.paymentMethods.map((p) => p.title).join(", ")}.`}
-            </p>
-            {error && <p className="mt-3 text-[0.82rem]" style={{ color: "var(--gold-bright)" }}>{error}</p>}
-            <button className="btn-gold w-full mt-5" onClick={startPayment} disabled={busy}>
-              {busy ? "Augnablik…" : `Greiða ${kr(summary.grandTotal)}`}
-            </button>
-            <button className="w-full mt-3 text-[0.75rem] tracking-[0.2em] uppercase cursor-pointer"
-              style={{ background: "none", border: "none", color: "var(--muted)" }}
-              onClick={() => setStep("methods")}>
-              ← Breyta afhendingu
-            </button>
-          </div>
-        )}
       </div>
     </section>
   );

@@ -47,6 +47,7 @@ export function ProductView({ adult, kids, live }: Props) {
       });
       if (!res.ok) throw new Error(await res.text());
       setAdded(true);
+      setQty(1); // fresh start for the next line — magnið byrjar alltaf á 1
       window.dispatchEvent(new Event("tk-cart-changed"));
       setTimeout(() => setAdded(false), 3000);
     } catch {
@@ -109,7 +110,7 @@ export function ProductView({ adult, kids, live }: Props) {
         <div className="flex flex-wrap gap-3 justify-center md:justify-start">
           {(["adult", "kids"] as Cat[]).map((c) => (
             <button key={c} className={`pill ${cat === c ? "selected" : ""}`}
-              onClick={() => { setCat(c); setChildSku(null); setError(null); }}>
+              onClick={() => { setCat(c); setChildSku(null); setQty(1); setError(null); }}>
               {c === "adult" ? "Fullorðins" : "Barna"}
             </button>
           ))}
@@ -122,7 +123,7 @@ export function ProductView({ adult, kids, live }: Props) {
           {product.variants.map((v) => (
             <button key={v.childSku} className={`pill ${childSku === v.childSku ? "selected" : ""}`}
               disabled={!v.inStock} title={v.inStock ? undefined : "Uppselt"}
-              onClick={() => { setChildSku(v.childSku); setError(null); }}>
+              onClick={() => { setChildSku(v.childSku); setQty(1); setError(null); }}>
               {v.sizeLabel}
             </button>
           ))}
